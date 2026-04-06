@@ -1,0 +1,4 @@
+adafruit-blinka>=8.0.0
+adafruit-circuitpython-pn532>=2.3.0
+spotipy>=2.23.0
+ndeflib>=0.3.3

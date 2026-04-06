@@ -1,0 +1,23 @@
+{
+  "wifi": [
+    { "ssid": "MyHomeNetwork", "psk": "wifi-password-here", "priority": 10 },
+    { "ssid": "MobileHotspot", "psk": "hotspot-password", "priority": 5 }
+  ],
+  "bluetooth": {
+    "speaker_mac": "AA:BB:CC:DD:EE:FF",
+    "speaker_name": "My BT Speaker"
+  },
+  "spotify": {
+    "client_id": "your_spotify_client_id",
+    "client_secret": "your_spotify_client_secret",
+    "redirect_uri": "http://localhost:8888/callback",
+    "device_name": "NFC-Box"
+  },
+  "nfc_tags": {
+    "04A1B2C3D4E5F6": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+    "04F7G8H9I0J1K2": "spotify:album:6dVIqQ8qmQ5GBnJ9shOYGE"
+  },
+  "behavior": {
+    "pause_on_remove": false
+  }
+}

@@ -1,0 +1,16 @@
+[Unit]
+Description=Bluetooth Speaker Auto-Connect
+After=bluetooth.target
+Requires=bluetooth.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__PROJECT_DIR__
+ExecStart=__PROJECT_DIR__/venv/bin/python3 -m src.bt_connect
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
