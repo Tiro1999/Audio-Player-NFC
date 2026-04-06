@@ -5,3 +5,4 @@ venv/
 .pytest_cache/
 spotify_cache
 .env
+config.json
