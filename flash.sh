@@ -86,7 +86,8 @@ scp $SSH_OPTS tools/spotify_auth.py          "$TARGET:$REMOTE_DIR/tools/"
 # ── Config (only if local file exists) ─────────────────────────────────────
 if [ -f config.json ]; then
     echo "📋  Copying config.json → /boot/firmware/ …"
-    scp $SSH_OPTS config.json "$TARGET:/boot/firmware/config.json"
+    scp $SSH_OPTS config.json "$TARGET:$REMOTE_DIR/config.json.tmp"
+    ssh $SSH_OPTS "$TARGET" "sudo cp $REMOTE_DIR/config.json.tmp /boot/firmware/config.json && rm $REMOTE_DIR/config.json.tmp"
 else
     echo "⚠️   No local config.json – skipping (use config.json.example as template)"
 fi
@@ -94,7 +95,8 @@ fi
 # ── Spotify token cache (only if local file exists) ────────────────────────
 if [ -f spotify_cache ]; then
     echo "🔑  Copying spotify_cache → /boot/firmware/ …"
-    scp $SSH_OPTS spotify_cache "$TARGET:/boot/firmware/spotify_cache"
+    scp $SSH_OPTS spotify_cache "$TARGET:$REMOTE_DIR/spotify_cache.tmp"
+    ssh $SSH_OPTS "$TARGET" "sudo cp $REMOTE_DIR/spotify_cache.tmp /boot/firmware/spotify_cache && rm $REMOTE_DIR/spotify_cache.tmp"
 fi
 
 echo ""
