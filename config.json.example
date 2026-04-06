@@ -1,10 +1,11 @@
 {
   "wifi": [
-    { "ssid": "MyHomeNetwork", "psk_hash": "← run: python3 tools/wifi_tools.py add SSID PASSWORD", "priority": 10 }
+    { "ssid": "MyHomeNetwork", "psk": "my-wifi-password", "priority": 10 },
+    { "ssid": "MobileHotspot", "psk": "hotspot-password", "priority": 3 }
   ],
   "bluetooth": {
     "speakers": [
-      { "mac": "AA:BB:CC:DD:EE:FF", "name": "My BT Speaker", "priority": 10 }
+      { "mac": "AA:BB:CC:DD:EE:FF", "name": "My BT Speaker", "priority": 1 }
     ]
   },
   "spotify": {

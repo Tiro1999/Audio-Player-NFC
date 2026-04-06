@@ -163,11 +163,50 @@ def cmd_apply(args):
     print(f"\n✅  {len(networks)} network(s) configured in NetworkManager")
 
 
+# ── SCAN ───────────────────────────────────────────────────────────────────
+
+def cmd_scan(args):
+    """Scan for available WiFi networks."""
+    print("📡  Scanning for WiFi networks …\n")
+    result = subprocess.run(
+        ["nmcli", "-t", "-f", "SIGNAL,SECURITY,SSID", "dev", "wifi", "list", "--rescan", "yes"],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"❌  nmcli error: {result.stderr.strip()}")
+        return
+
+    lines = [l.strip() for l in result.stdout.strip().splitlines() if l.strip()]
+    if not lines:
+        print("No WiFi networks found.")
+        return
+
+    print(f"  {'Signal':<8} {'Security':<20} {'SSID'}")
+    print(f"  {'─' * 8} {'─' * 20} {'─' * 30}")
+    seen = set()
+    for line in sorted(lines, key=lambda l: int(l.split(":")[0] or "0"), reverse=True):
+        parts = line.split(":", 2)
+        if len(parts) < 3 or not parts[2]:
+            continue
+        ssid = parts[2]
+        if ssid in seen:
+            continue
+        seen.add(ssid)
+        signal = parts[0] + "%"
+        security = parts[1] if parts[1] else "Open"
+        print(f"  {signal:<8} {security:<20} {ssid}")
+
+    print(f"\n  {len(seen)} network(s) found")
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="WiFi tools for NFC Spotify Player")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    p_scan = sub.add_parser("scan", help="Scan for available WiFi networks")
+    p_scan.set_defaults(func=cmd_scan)
 
     p_add = sub.add_parser("add", help="Add WiFi network (password is hashed, never stored)")
     p_add.add_argument("ssid", help="WiFi SSID")

@@ -100,6 +100,18 @@ fi
 echo ""
 echo "✅  Files transferred!"
 
+# ── Config reminder ────────────────────────────────────────────────────────
+if [ ! -f config.json ]; then
+    echo ""
+    echo "💡  Tipp: config.json wurde noch nicht übertragen."
+    echo "    Erstelle eine aus der Vorlage:"
+    echo "      cp config.json.example config.json"
+    echo "    Pflichtfelder: spotify.client_id, spotify.client_secret"
+    echo "    WiFi & BT Speakers können per Tool auf dem Pi eingerichtet werden:"
+    echo "      python3 ~/nfc-player/tools/wifi_tools.py add \"SSID\" \"Passwort\""
+    echo "      python3 ~/nfc-player/tools/bt_tools.py scan"
+fi
+
 # ── Reboot ─────────────────────────────────────────────────────────────────
 if [ "$DO_REBOOT" = true ]; then
     echo "🔄  Rebooting Pi …"
