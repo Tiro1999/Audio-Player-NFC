@@ -15,6 +15,10 @@ if [ ! -f .env ]; then
 fi
 source .env
 
+# Strip Windows \r from sourced values
+PI_IP="$(echo "$PI_IP" | tr -d '\r')"
+PI_USER="$(echo "$PI_USER" | tr -d '\r')"
+
 : "${PI_IP:?PI_IP not set in .env}"
 : "${PI_USER:?PI_USER not set in .env}"
 
