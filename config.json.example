@@ -1,7 +1,6 @@
 {
   "wifi": [
-    { "ssid": "MyHomeNetwork", "psk": "wifi-password-here", "priority": 10 },
-    { "ssid": "MobileHotspot", "psk": "hotspot-password", "priority": 5 }
+    { "ssid": "MyHomeNetwork", "psk_hash": "← run: python3 tools/wifi_tools.py add SSID PASSWORD", "priority": 10 }
   ],
   "bluetooth": {
     "speakers": [

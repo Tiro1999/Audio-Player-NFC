@@ -79,6 +79,8 @@ scp $SSH_OPTS setup/install.sh               "$TARGET:$REMOTE_DIR/setup/"
 scp $SSH_OPTS setup/nfc-player.service       "$TARGET:$REMOTE_DIR/setup/"
 scp $SSH_OPTS setup/bt-autoconnect.service   "$TARGET:$REMOTE_DIR/setup/"
 scp $SSH_OPTS tools/bt_tools.py              "$TARGET:$REMOTE_DIR/tools/"
+scp $SSH_OPTS tools/wifi_tools.py            "$TARGET:$REMOTE_DIR/tools/"
+scp $SSH_OPTS tools/nfc_test.py              "$TARGET:$REMOTE_DIR/tools/"
 scp $SSH_OPTS tools/spotify_auth.py          "$TARGET:$REMOTE_DIR/tools/"
 
 # ── Config (only if local file exists) ─────────────────────────────────────
