@@ -39,11 +39,11 @@ def main():
             cfg = json.load(f)
         client_id = cfg["spotify"]["client_id"]
         client_secret = cfg["spotify"]["client_secret"]
-        redirect_uri = cfg["spotify"].get("redirect_uri", "http://localhost:8888/callback")
+        redirect_uri = cfg["spotify"].get("redirect_uri", "http://127.0.0.1:8888/callback")
     elif args.client_id and args.client_secret:
         client_id = args.client_id
         client_secret = args.client_secret
-        redirect_uri = "http://localhost:8888/callback"
+        redirect_uri = "http://127.0.0.1:8888/callback"
     else:
         parser.error("Provide --config OR both --client-id and --client-secret")
 

@@ -56,7 +56,7 @@ NFC Tag  →  PN532 (I2C)  →  Python app
 3. Klicke **"Create App"**
    - Name: z.B. `NFC Player` (egal was)
    - Description: egal
-   - Redirect URI: `http://localhost:8888/callback`
+   - Redirect URI: `http://127.0.0.1:8888/callback`
    - API: Web API ankreuzen
 4. Nach dem Erstellen siehst du **Client ID** und **Client Secret** → diese beiden Werte kommen in `config.json`
 
@@ -104,7 +104,7 @@ Copy `config.json.example`, fill in your values, and save as `config.json`:
   "spotify": {
     "client_id": "your_client_id",
     "client_secret": "your_client_secret",
-    "redirect_uri": "http://localhost:8888/callback",
+    "redirect_uri": "http://127.0.0.1:8888/callback",
     "device_name": "NFC-Box"
   },
   "nfc_tags": {

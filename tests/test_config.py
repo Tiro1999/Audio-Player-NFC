@@ -26,7 +26,7 @@ def sample_config(tmp_path):
         "spotify": {
             "client_id": "test_client_id",
             "client_secret": "test_client_secret",
-            "redirect_uri": "http://localhost:8888/callback",
+            "redirect_uri": "http://127.0.0.1:8888/callback",
             "device_name": "Test-Box",
         },
         "nfc_tags": {
@@ -48,7 +48,7 @@ def test_load_config(sample_config):
     assert cfg.speaker_name == "Speaker A"
     assert cfg.device_name == "Test-Box"
     assert cfg.client_id == "test_client_id"
-    assert cfg.redirect_uri == "http://localhost:8888/callback"
+    assert cfg.redirect_uri == "http://127.0.0.1:8888/callback"
 
 
 def test_speakers_sorted_by_priority(sample_config):

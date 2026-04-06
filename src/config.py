@@ -97,7 +97,7 @@ class Config:
 
     @property
     def redirect_uri(self):
-        return self.spotify.get("redirect_uri", "http://localhost:8888/callback")
+        return self.spotify.get("redirect_uri", "http://127.0.0.1:8888/callback")
 
     # --- NFC Tags ---
     @property
