@@ -3,6 +3,11 @@
 A standalone NFC-based Spotify player for the **Raspberry Pi Zero 2 W**.
 Scan an NFC tag → music plays on your Bluetooth speaker. No screen, no app – just tap & play.
 
+## Hardware
+For Details see [Hardware Documentation](hardware-docs/README.md)
+
+![Raspberry Pi Zero 2W](hardware-docs/res/raspPi_Zero2W.png){width=48 height=16}
+
 ## How It Works
 
 ```
@@ -37,7 +42,7 @@ NFC Tag  →  PN532 (I2C)  →  Python app
 
 > Set the PN532 DIP switches to **I2C mode**: SEL0 = ON, SEL1 = OFF.
 
-## Prerequisites
+## Pre-Requisites
 
 - **Spotify Premium** account (required for playback control via API)
 - A Spotify Developer App (see Step 2 below)
@@ -169,6 +174,8 @@ cd ~/nfc-player
 bash setup/install.sh
 sudo reboot
 ```
+
+<img src="hardware-docs/res/install_on_pi.png" alt="isolated" width="128"/>
 
 After reboot the Pi will:
 1. Connect to WiFi (from your configured list)
