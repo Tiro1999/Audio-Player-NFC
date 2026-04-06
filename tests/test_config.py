@@ -18,8 +18,10 @@ def sample_config(tmp_path):
             {"ssid": "TestNet", "psk": "pass123", "priority": 10},
         ],
         "bluetooth": {
-            "speaker_mac": "AA:BB:CC:DD:EE:FF",
-            "speaker_name": "Test Speaker",
+            "speakers": [
+                {"mac": "AA:BB:CC:DD:EE:FF", "name": "Speaker A", "priority": 10},
+                {"mac": "11:22:33:44:55:66", "name": "Speaker B", "priority": 5},
+            ]
         },
         "spotify": {
             "client_id": "test_client_id",
@@ -43,10 +45,37 @@ def sample_config(tmp_path):
 def test_load_config(sample_config):
     cfg = Config(sample_config)
     assert cfg.speaker_mac == "AA:BB:CC:DD:EE:FF"
-    assert cfg.speaker_name == "Test Speaker"
+    assert cfg.speaker_name == "Speaker A"
     assert cfg.device_name == "Test-Box"
     assert cfg.client_id == "test_client_id"
     assert cfg.redirect_uri == "http://localhost:8888/callback"
+
+
+def test_speakers_sorted_by_priority(sample_config):
+    cfg = Config(sample_config)
+    speakers = cfg.speakers
+    assert len(speakers) == 2
+    assert speakers[0]["priority"] == 10
+    assert speakers[0]["mac"] == "AA:BB:CC:DD:EE:FF"
+    assert speakers[1]["priority"] == 5
+    assert speakers[1]["mac"] == "11:22:33:44:55:66"
+
+
+def test_legacy_single_speaker_format(tmp_path):
+    """Old single-speaker format is auto-migrated."""
+    data = {
+        "bluetooth": {
+            "speaker_mac": "AA:BB:CC:DD:EE:FF",
+            "speaker_name": "Legacy Speaker",
+        },
+        "spotify": {},
+    }
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps(data))
+    cfg = Config(str(path))
+    assert len(cfg.speakers) == 1
+    assert cfg.speaker_mac == "AA:BB:CC:DD:EE:FF"
+    assert cfg.speaker_name == "Legacy Speaker"
 
 
 def test_wifi_networks(sample_config):

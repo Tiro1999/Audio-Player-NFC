@@ -47,12 +47,36 @@ class Config:
         return self._data.get("bluetooth", {})
 
     @property
+    def speakers(self):
+        """Return list of speakers sorted by priority (highest first).
+
+        Supports both the new multi-speaker format and the legacy single-speaker
+        format for backward compatibility.
+        """
+        bt = self.bluetooth
+        if "speakers" in bt:
+            speakers = list(bt["speakers"])
+        elif "speaker_mac" in bt:
+            speakers = [{
+                "mac": bt["speaker_mac"],
+                "name": bt.get("speaker_name", bt["speaker_mac"]),
+                "priority": 10,
+            }]
+        else:
+            return []
+        return sorted(speakers, key=lambda s: s.get("priority", 0), reverse=True)
+
+    @property
     def speaker_mac(self):
-        return self.bluetooth.get("speaker_mac", "")
+        """MAC of the highest-priority speaker (backward compat)."""
+        speakers = self.speakers
+        return speakers[0]["mac"] if speakers else ""
 
     @property
     def speaker_name(self):
-        return self.bluetooth.get("speaker_name", "")
+        """Name of the highest-priority speaker (backward compat)."""
+        speakers = self.speakers
+        return speakers[0].get("name", "") if speakers else ""
 
     # --- Spotify ---
     @property

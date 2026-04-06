@@ -40,8 +40,22 @@ NFC Tag  →  PN532 (I2C)  →  Python app
 ## Prerequisites
 
 - **Spotify Premium** account (required for playback control via API)
-- A [Spotify Developer App](https://developer.spotify.com/dashboard) → note Client ID & Secret
-- Set the Redirect URI in your app to `http://localhost:8888/callback`
+- A Spotify Developer App (see Step 2 below)
+
+## Spotify Developer App einrichten (einmalig)
+
+> Du brauchst **keine** Programmierkenntnisse – nur einen Spotify Premium Account.
+
+1. Öffne [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
+2. Logge dich mit deinem normalen Spotify-Konto ein
+3. Klicke **"Create App"**
+   - Name: z.B. `NFC Player` (egal was)
+   - Description: egal
+   - Redirect URI: `http://localhost:8888/callback`
+   - API: Web API ankreuzen
+4. Nach dem Erstellen siehst du **Client ID** und **Client Secret** → diese beiden Werte kommen in `config.json`
+
+Die Client ID / Secret sind **nicht** dein Spotify-Passwort – sie sind nur ein API-Schlüssel für deine App.
 
 ## Project Structure
 
@@ -118,25 +132,35 @@ cp .env.example .env
 Then deploy with one command:
 
 ```bash
-bash deploy.sh
+bash flash.sh              # deploy + reboot
+bash flash.sh --no-reboot  # deploy only (dev)
 ```
 
 See **[LOCATION.md](LOCATION.md)** for manual SCP commands and the detailed file mapping.
 
 ### Step 4 – Pair Bluetooth Speaker (on the Pi via SSH)
 
+Use the built-in Bluetooth tool:
+
 ```bash
-bluetoothctl
-# In bluetoothctl shell:
-power on
-agent on
-scan on
-# Wait for your speaker to appear, then:
-pair AA:BB:CC:DD:EE:FF
-trust AA:BB:CC:DD:EE:FF
-connect AA:BB:CC:DD:EE:FF
-exit
+# Scan for nearby speakers (turn speaker on & into pairing mode first)
+python3 ~/nfc-player/tools/bt_tools.py scan
+
+# Connect and save to config.json (priority 1-10, 10 = highest)
+python3 ~/nfc-player/tools/bt_tools.py connect AA:BB:CC:DD:EE:FF --priority 10
+
+# Or connect by name
+python3 ~/nfc-player/tools/bt_tools.py connect "JBL Flip 5" --priority 10
+
+# List configured speakers
+python3 ~/nfc-player/tools/bt_tools.py list
+
+# Remove a speaker
+python3 ~/nfc-player/tools/bt_tools.py remove AA:BB:CC:DD:EE:FF
 ```
+
+The tool automatically saves the speaker to `config.json` with the given priority.
+After a reboot, the Pi will auto-connect to the highest-priority available speaker.
 
 ### Step 5 – Install & Start (on the Pi via SSH)
 
@@ -148,22 +172,23 @@ sudo reboot
 
 After reboot the Pi will:
 1. Connect to WiFi (from your configured list)
-2. Auto-connect to the Bluetooth speaker
+2. Auto-connect to the highest-priority Bluetooth speaker
 3. Start Raspotify (Spotify Connect receiver)
 4. Wait for NFC tags
 
 ### Step 6 – Write NFC Tags
 
-Use any NFC writer app on your phone (e.g. *NFC Tools*):
+Use any NFC writer app on your phone (e.g. *NFC Tools* for iOS/Android):
 
-- **Option A** – Write a Spotify URI as an NDEF record:
-  `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M`
+1. Open the app and tap "Write"
+2. Add a **URI record** with a Spotify link, e.g.:
+   `https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M`
+3. Hold your NFC tag to your phone → write
 
-- **Option B** – Just use the tag's UID and map it in `config.json` under `nfc_tags`.
-  To find a tag's UID, hold it to the reader and check the logs:
-  ```bash
-  journalctl -u nfc-player -f
-  ```
+That's it! The link is now on the tag. Hold the tag to the PN532 reader
+and the music starts playing.
+
+> **Tipp:** Du findest den Spotify-Link in der Spotify-App unter *Teilen → Link kopieren*.
 
 ## Managing the Device
 
