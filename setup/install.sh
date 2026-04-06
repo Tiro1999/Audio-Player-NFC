@@ -40,7 +40,16 @@ sudo raspi-config nonint do_i2c 0
 echo "I2C enabled (reboot may be required for first use)"
 
 # ------------------------------------------------------------------
-# 3. Python virtual environment
+# 3. Create log file
+# ------------------------------------------------------------------
+echo -e "\n>>> Creating log file …"
+sudo touch /var/log/nfc_player.log
+sudo chown "$CURRENT_USER":"$CURRENT_USER" /var/log/nfc_player.log
+sudo chmod 644 /var/log/nfc_player.log
+echo "Log file: /var/log/nfc_player.log"
+
+# ------------------------------------------------------------------
+# 4. Python virtual environment
 # ------------------------------------------------------------------
 VENV_DIR="$PROJECT_DIR/venv"
 echo -e "\n>>> Setting up Python venv in $VENV_DIR …"
@@ -50,7 +59,7 @@ pip install --upgrade pip
 pip install -r "$PROJECT_DIR/requirements.txt"
 
 # ------------------------------------------------------------------
-# 4. Install Raspotify (Spotify Connect receiver)
+# 5. Install Raspotify (Spotify Connect receiver)
 # ------------------------------------------------------------------
 echo -e "\n>>> Installing Raspotify …"
 if ! command -v raspotify &>/dev/null; then
@@ -88,7 +97,7 @@ Environment=PULSE_RUNTIME_PATH=/run/user/$(id -u)/pulse
 EOF
 
 # ------------------------------------------------------------------
-# 5. PulseAudio for headless Bluetooth audio
+# 6. PulseAudio for headless Bluetooth audio
 # ------------------------------------------------------------------
 echo -e "\n>>> Configuring PulseAudio …"
 sudo loginctl enable-linger "$CURRENT_USER"
@@ -109,7 +118,7 @@ systemctl --user enable pulseaudio || true
 systemctl --user start pulseaudio || true
 
 # ------------------------------------------------------------------
-# 6. Install systemd services
+# 7. Install systemd services
 # ------------------------------------------------------------------
 echo -e "\n>>> Installing systemd services …"
 
@@ -125,7 +134,7 @@ sudo systemctl enable bt-autoconnect.service
 sudo systemctl enable nfc-player.service
 
 # ------------------------------------------------------------------
-# 7. Reminder: config & token
+# 8. Reminder: config & token
 # ------------------------------------------------------------------
 echo ""
 echo "========================================"

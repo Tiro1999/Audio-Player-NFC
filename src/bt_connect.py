@@ -6,17 +6,14 @@ priority (highest priority wins).  Runs as a systemd service.
 """
 
 import json
-import logging
 import os
 import subprocess
 import sys
 import time
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [bt-connect] %(levelname)s: %(message)s",
-)
-logger = logging.getLogger(__name__)
+from .logger import Logger
+
+logger = Logger(__name__)
 
 CONFIG_PATHS = ["/boot/firmware/config.json", "/boot/config.json"]
 RETRY_INTERVAL = 5   # seconds between connection checks

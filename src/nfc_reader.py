@@ -5,11 +5,13 @@ Supports two modes for resolving Spotify URIs:
   2. UID  – use the tag's unique ID to look up a URI in config.json
 """
 
-import logging
 import re
 import time
+from urllib.parse import urlparse
 
-logger = logging.getLogger(__name__)
+from .logger import Logger
+
+logger = Logger(__name__)
 
 # Lazy imports – these are only available on the Pi
 _pn532 = None
@@ -48,6 +50,37 @@ def spotify_url_to_uri(url):
     return None
 
 
+def is_valid_spotify_uri(uri):
+    """Validate that *uri* points to a genuine Spotify resource.
+
+    Accepts:
+      • ``spotify:track:xxx``, ``spotify:playlist:xxx``, …
+      • ``https://open.spotify.com/track/xxx``
+
+    Rejects everything else (security: prevents arbitrary URL injection).
+    """
+    if not uri or not isinstance(uri, str):
+        return False
+    # Native Spotify URI
+    if re.match(
+        r"^spotify:(track|album|playlist|artist|episode|show):[a-zA-Z0-9]+$", uri
+    ):
+        return True
+    # Spotify web URL – strict hostname check
+    try:
+        parsed = urlparse(uri)
+        return (
+            parsed.scheme in ("http", "https")
+            and parsed.hostname == "open.spotify.com"
+            and bool(re.match(
+                r"^/(track|album|playlist|artist|episode|show)/[a-zA-Z0-9]+",
+                parsed.path,
+            ))
+        )
+    except Exception:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # NDEF helpers (NTAG213 / 215 / 216)
 # ---------------------------------------------------------------------------
@@ -63,6 +96,7 @@ def _read_tag_user_memory(pn532, max_pages=40):
             data.extend(block)
         except Exception:
             break
+    logger.trace("Read %d bytes of tag user memory", len(data))
     return bytes(data)
 
 
@@ -121,14 +155,19 @@ class NFCReader:
 
         1. Attempt to read NDEF data from the tag.
         2. Fall back to UID → URI mapping from config.
+        3. Validate that the result is a genuine Spotify URI.
         """
         # 1. NDEF
         try:
             raw = _read_tag_user_memory(self.pn532)
             if raw:
+                logger.trace("Raw NDEF (%d bytes): %s…", len(raw), raw[:64].hex())
                 uri = _extract_ndef_uri(raw)
                 if uri:
-                    logger.info("NDEF URI found: %s", uri)
+                    if not is_valid_spotify_uri(uri):
+                        logger.warn("NDEF URI rejected (not a Spotify link): %s", uri)
+                        return None
+                    logger.info("NDEF URI: %s", uri)
                     return uri
         except Exception as exc:
             logger.debug("NDEF read failed: %s", exc)
@@ -136,8 +175,14 @@ class NFCReader:
         # 2. UID lookup
         uri = nfc_tags_map.get(uid_hex)
         if uri:
-            logger.info("UID %s → %s (config lookup)", uid_hex, uri)
-            return spotify_url_to_uri(uri) or uri
+            resolved = spotify_url_to_uri(uri) or uri
+            if not is_valid_spotify_uri(resolved):
+                logger.warn("Config URI rejected (not a Spotify link): %s", resolved)
+                return None
+            logger.info("UID %s → %s (config lookup)", uid_hex, resolved)
+            return resolved
+
+        logger.debug("No URI mapping for tag %s", uid_hex)
         return None
 
     def wait_for_removal(self, poll_interval=0.3, timeout=0.5):

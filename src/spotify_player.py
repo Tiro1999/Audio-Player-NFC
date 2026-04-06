@@ -1,13 +1,15 @@
 """Spotify playback control via the Spotify Web API (spotipy)."""
 
-import logging
 import os
 import time
 
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-logger = logging.getLogger(__name__)
+from .logger import Logger
+from .nfc_reader import is_valid_spotify_uri
+
+logger = Logger(__name__)
 
 SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing"
 
@@ -36,6 +38,17 @@ class SpotifyPlayer:
                 open_browser=False,
             )
         )
+
+        # Log the authenticated user
+        try:
+            user = self._sp.current_user()
+            logger.info(
+                "Spotify authenticated as: %s (%s)",
+                user.get("display_name", "?"),
+                user.get("id", "?"),
+            )
+        except Exception as exc:
+            logger.warn("Could not verify Spotify auth: %s", exc)
 
     # ------------------------------------------------------------------
     # Device discovery
@@ -67,9 +80,14 @@ class SpotifyPlayer:
         """
         Start playback of *spotify_uri* on the configured device.
 
+        Rejects URIs that don't point to Spotify (security).
         Retries a few times if the device isn't found immediately (Raspotify
         may still be starting up).
         """
+        if not is_valid_spotify_uri(spotify_uri):
+            logger.error("URI rejected (not a valid Spotify link): %s", spotify_uri)
+            return False
+
         for attempt in range(1, retries + 1):
             device_id = self._find_device_id()
             if device_id:
@@ -102,7 +120,7 @@ class SpotifyPlayer:
             self._sp.pause_playback()
             logger.info("⏸  Paused")
         except Exception as exc:
-            logger.debug("Pause failed (may already be paused): %s", exc)
+            logger.trace("Pause failed (may already be paused): %s", exc)
 
     def resume(self):
         """Resume playback on the configured device."""
@@ -113,7 +131,7 @@ class SpotifyPlayer:
             self._sp.start_playback(device_id=device_id)
             logger.info("▶  Resumed")
         except Exception as exc:
-            logger.debug("Resume failed: %s", exc)
+            logger.trace("Resume failed: %s", exc)
 
     def current_playback(self):
         """Return the current playback state dict (or None)."""

@@ -4,20 +4,16 @@ Continuously reads NFC tags and triggers Spotify playback.
 Run with:  python3 -m src.main
 """
 
-import logging
 import signal
 import sys
 import time
 
 from .config import Config
+from .logger import Logger
 from .nfc_reader import NFCReader
 from .spotify_player import SpotifyPlayer
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
-logger = logging.getLogger("nfc-player")
+logger = Logger("nfc-player")
 
 _shutdown = False
 
