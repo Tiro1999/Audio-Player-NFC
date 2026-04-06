@@ -1,0 +1,34 @@
+{
+  "_comment": "Copy this file to /boot/config.json on the Raspberry Pi SD card. The /boot partition is FAT32 and readable on any Windows or Mac PC without special tools.",
+  "wifi": [
+    {
+      "ssid": "MyHomeNetwork",
+      "password": "MyWifiPassword",
+      "priority": 10
+    },
+    {
+      "ssid": "BackupNetwork",
+      "password": "BackupPassword",
+      "priority": 5
+    }
+  ],
+  "spotify": {
+    "client_id": "YOUR_SPOTIFY_CLIENT_ID",
+    "client_secret": "YOUR_SPOTIFY_CLIENT_SECRET",
+    "redirect_uri": "http://localhost:8888/callback",
+    "device_name": "NFC-Player"
+  },
+  "bluetooth": {
+    "device_name": "My Bluetooth Speaker",
+    "mac_address": "AA:BB:CC:DD:EE:FF",
+    "reconnect_interval_seconds": 10
+  },
+  "nfc": {
+    "reader_type": "rc522",
+    "tag_mappings": {
+      "AABBCCDD": "spotify:playlist:37i9dQZF1DXcBWIGoYBM5M",
+      "11223344": "spotify:album:1DFixLWuPkv3KT3TnV35m3",
+      "DEADBEEF": "spotify:artist:06HL4z0CvFAxyc27GXpf02"
+    }
+  }
+}

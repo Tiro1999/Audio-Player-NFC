@@ -1,0 +1,17 @@
+[Unit]
+Description=Bluetooth Auto-Connect for NFC Audio Player
+After=bluetooth.service
+Requires=bluetooth.service
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/local/bin/bt-connect.sh
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bt-connect
+
+[Install]
+WantedBy=multi-user.target

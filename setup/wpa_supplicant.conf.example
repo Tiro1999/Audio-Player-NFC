@@ -1,0 +1,25 @@
+# wpa_supplicant.conf – example multi-network WiFi configuration
+#
+# This file is managed automatically by setup/install.sh based on the
+# "wifi" list in /boot/config.json.  You can also edit it directly at
+# /etc/wpa_supplicant/wpa_supplicant.conf on the Raspberry Pi.
+#
+# Higher priority = preferred network.
+
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=DE
+
+network={
+    ssid="MyHomeNetwork"
+    psk="MyWifiPassword"
+    priority=10
+    key_mgmt=WPA-PSK
+}
+
+network={
+    ssid="BackupNetwork"
+    psk="BackupPassword"
+    priority=5
+    key_mgmt=WPA-PSK
+}

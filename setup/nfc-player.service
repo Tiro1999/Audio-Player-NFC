@@ -1,0 +1,20 @@
+[Unit]
+Description=NFC Audio Player
+Documentation=https://github.com/Tiro1999/Audio-Player-NFC
+After=network-online.target raspotify.service bluetooth.service
+Wants=network-online.target
+Requires=raspotify.service
+
+[Service]
+Type=simple
+User=%SERVICE_USER%
+WorkingDirectory=%REPO_DIR%
+ExecStart=%VENV_DIR%/bin/python3 -m src.main
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nfc-player
+
+[Install]
+WantedBy=multi-user.target
