@@ -12,7 +12,8 @@ PI_IP=192.168.0.0
 PI_USER=user
 ```
 
-> **Automated deploy:** Run `bash deploy.sh` to copy all files at once.
+> **Automated deploy:** Run `bash flash.sh` to deploy & reboot,
+> or `bash flash.sh --no-reboot` for dev iterations.
 
 ## Quick Setup (manual)
 
