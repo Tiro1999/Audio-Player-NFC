@@ -82,6 +82,8 @@ class TestIsSpotifyUri:
         "https://www.google.com",
         "http://example.com",
         "https://music.apple.com/playlist/abc",
+        "https://evil.open.spotify.com/track/abc",  # subdomain attack
+        "https://notopen.spotify.com/track/abc",    # different domain
         "",
     ])
     def test_returns_false_for_non_spotify_uris(self, uri):

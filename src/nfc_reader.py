@@ -31,6 +31,7 @@ SPI must be enabled (``raspi-config`` → *Interface Options* → *SPI*).
 import logging
 import time
 from typing import Optional
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -86,8 +87,6 @@ def _parse_ndef_records(raw_bytes: bytes) -> list[dict]:
     records = []
     pos = 0
     while pos < len(raw_bytes):
-        if pos >= len(raw_bytes):
-            break
         header = raw_bytes[pos]
         pos += 1
 
@@ -190,7 +189,13 @@ def _extract_spotify_uri_from_ndef(raw_bytes: bytes) -> Optional[str]:
 
 
 def _is_spotify_uri(text: str) -> bool:
-    return text.startswith("spotify:") or "open.spotify.com/" in text
+    if text.startswith("spotify:"):
+        return True
+    try:
+        parsed = urlparse(text)
+        return parsed.netloc == "open.spotify.com"
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _normalise_spotify_uri(text: str) -> str:
@@ -200,11 +205,12 @@ def _normalise_spotify_uri(text: str) -> str:
     # https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
     # → spotify:playlist:37i9dQZF1DXcBWIGoYBM5M
     try:
-        path = text.split("open.spotify.com/", 1)[1].split("?")[0]
-        parts = path.strip("/").split("/")
-        if len(parts) >= 2:
-            return "spotify:" + ":".join(parts[:2])
-    except (IndexError, AttributeError):
+        parsed = urlparse(text)
+        if parsed.netloc == "open.spotify.com":
+            parts = parsed.path.strip("/").split("/")
+            if len(parts) >= 2:
+                return "spotify:" + ":".join(parts[:2])
+    except Exception:  # noqa: BLE001
         pass
     return text
 

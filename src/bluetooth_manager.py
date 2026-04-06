@@ -25,6 +25,14 @@ from threading import Event, Thread
 logger = logging.getLogger(__name__)
 
 
+def _mask_mac(mac: str) -> str:
+    """Return a partially masked MAC for log messages (hides last 3 octets)."""
+    parts = mac.split(":")
+    if len(parts) == 6:
+        return ":".join(parts[:3] + ["**", "**", "**"])
+    return "**:**:**:**:**:**"
+
+
 def _run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
     """Run *cmd* and return *(returncode, stdout, stderr)*."""
     try:
@@ -36,7 +44,7 @@ def _run(cmd: list[str], timeout: int = 10) -> tuple[int, str, str]:
         )
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
-        logger.warning("Command %s timed out after %ds", cmd, timeout)
+        logger.warning("Command '%s' timed out after %ds", cmd[0], timeout)
         return -1, "", "timeout"
     except FileNotFoundError:
         logger.error("Command not found: %s", cmd[0])
@@ -79,13 +87,13 @@ class BluetoothManager:
 
     def connect(self) -> bool:
         """Attempt a single connect; return *True* on success."""
-        logger.info("Connecting to %s (%s)…", self._name, self._mac)
+        logger.info("Connecting to %s (%s)…", self._name, _mask_mac(self._mac))
         rc, stdout, _ = _run(["bluetoothctl", "connect", self._mac], timeout=15)
         success = rc == 0 and "Connection successful" in stdout
         if success:
-            logger.info("Connected to %s (%s)", self._name, self._mac)
+            logger.info("Connected to %s (%s)", self._name, _mask_mac(self._mac))
         else:
-            logger.debug("Connect attempt failed for %s", self._mac)
+            logger.debug("Connect attempt failed for %s", _mask_mac(self._mac))
         return success
 
     def trust(self) -> bool:
@@ -117,7 +125,7 @@ class BluetoothManager:
         logger.info(
             "Bluetooth reconnect loop started for %s (%s), interval=%ds",
             self._name,
-            self._mac,
+            _mask_mac(self._mac),
             int(self._interval),
         )
 
