@@ -7,6 +7,7 @@ priority (highest priority wins).  Runs as a systemd service.
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -18,6 +19,16 @@ logger = Logger(__name__)
 CONFIG_PATHS = ["/boot/firmware/config.json", "/boot/config.json"]
 RETRY_INTERVAL = 5   # seconds between connection checks
 SETTLE_TIME = 3       # seconds to wait after a connect attempt
+CONFIG_RELOAD_INTERVAL = 60  # re-read config every N seconds
+
+_PLACEHOLDER_MACS = {"AA:BB:CC:DD:EE:FF", "00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"}
+
+
+def _is_valid_mac(mac):
+    """Return True if mac is a real (non-placeholder) BT address."""
+    if not re.match(r"^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$", mac):
+        return False
+    return mac.upper() not in _PLACEHOLDER_MACS
 
 
 def load_speakers():
@@ -30,10 +41,8 @@ def load_speakers():
         except (FileNotFoundError, KeyError):
             continue
     else:
-        logger.error("No config.json with bluetooth section found")
-        sys.exit(1)
+        return []
 
-    # Support both multi-speaker and legacy single-speaker format
     if "speakers" in bt:
         speakers = list(bt["speakers"])
     elif "speaker_mac" in bt:
@@ -43,10 +52,15 @@ def load_speakers():
             "priority": 10,
         }]
     else:
-        logger.error("No speakers configured in config.json")
-        sys.exit(1)
+        return []
 
-    return sorted(speakers, key=lambda s: s.get("priority", 0), reverse=True)
+    # Filter out placeholder/invalid MACs
+    valid = [s for s in speakers if _is_valid_mac(s.get("mac", ""))]
+    skipped = len(speakers) - len(valid)
+    if skipped > 0:
+        logger.debug("Skipped %d placeholder speaker(s)", skipped)
+
+    return sorted(valid, key=lambda s: s.get("priority", 0), reverse=True)
 
 
 def _run(cmd):
@@ -62,7 +76,7 @@ def is_connected(mac):
 
 
 def connect(mac):
-    logger.info("Attempting connection to %s …", mac)
+    logger.info("Attempting connection to %s", mac)
     _run(["bluetoothctl", "power", "on"])
     _run(["bluetoothctl", "connect", mac])
     time.sleep(SETTLE_TIME)
@@ -76,24 +90,41 @@ def ensure_trusted(mac):
 def main():
     speakers = load_speakers()
 
-    logger.info("Configured speakers (by priority):")
-    for s in speakers:
-        logger.info("  [prio %d] %s (%s)", s.get("priority", 0), s.get("name", "?"), s["mac"])
-
-    for s in speakers:
-        ensure_trusted(s["mac"])
+    if speakers:
+        logger.info("Configured speakers (by priority):")
+        for s in speakers:
+            logger.info("  [prio %d] %s (%s)", s.get("priority", 0), s.get("name", "?"), s["mac"])
+        for s in speakers:
+            ensure_trusted(s["mac"])
+    else:
+        logger.info("No valid speakers configured – waiting for config update …")
 
     connected_mac = None
     connected_name = None
+    last_config_load = time.time()
 
     while True:
+        # Periodically reload config to pick up new speakers added via bt_tools
+        if time.time() - last_config_load > CONFIG_RELOAD_INTERVAL:
+            new_speakers = load_speakers()
+            if new_speakers != speakers:
+                speakers = new_speakers
+                logger.info("Config reloaded – %d speaker(s)", len(speakers))
+                for s in speakers:
+                    ensure_trusted(s["mac"])
+            last_config_load = time.time()
+
+        if not speakers:
+            time.sleep(RETRY_INTERVAL)
+            continue
+
         # If currently connected, just monitor
         if connected_mac and is_connected(connected_mac):
             time.sleep(RETRY_INTERVAL)
             continue
 
         if connected_mac:
-            logger.warning("Lost connection to %s (%s)", connected_name, connected_mac)
+            logger.warn("Lost connection to %s (%s)", connected_name, connected_mac)
             connected_mac = None
             connected_name = None
 
@@ -102,17 +133,17 @@ def main():
             mac = speaker["mac"]
             name = speaker.get("name", mac)
             prio = speaker.get("priority", 0)
-            logger.info("Trying %s (%s, prio %d) …", name, mac, prio)
+            logger.info("Trying %s (%s, prio %d)", name, mac, prio)
 
             connect(mac)
 
             if is_connected(mac):
-                logger.info("✔ Connected to %s (%s)", name, mac)
+                logger.info("Connected to %s (%s)", name, mac)
                 connected_mac = mac
                 connected_name = name
                 break
         else:
-            logger.warning("No speakers available – retrying in %ds", RETRY_INTERVAL)
+            logger.debug("No speakers available – retrying in %ds", RETRY_INTERVAL)
 
         time.sleep(RETRY_INTERVAL)
 

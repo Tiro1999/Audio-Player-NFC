@@ -10,12 +10,12 @@ import time
 
 from .config import Config
 from .logger import Logger
-from .nfc_reader import NFCReader
-from .spotify_player import SpotifyPlayer
 
 logger = Logger("nfc-player")
 
 _shutdown = False
+
+NFC_RETRY_INTERVAL = 10  # seconds between NFC init retries
 
 
 def _handle_signal(signum, frame):
@@ -24,20 +24,57 @@ def _handle_signal(signum, frame):
     _shutdown = True
 
 
+def _init_nfc():
+    """Try to initialise the NFC reader, return None if hardware is missing."""
+    try:
+        from .nfc_reader import NFCReader
+        reader = NFCReader()
+        logger.info("NFC reader initialised successfully")
+        return reader
+    except Exception as exc:
+        logger.warn("NFC reader not available: %s", exc)
+        return None
+
+
+def _init_spotify(config):
+    """Try to initialise the Spotify player, return None on failure."""
+    try:
+        from .spotify_player import SpotifyPlayer
+        player = SpotifyPlayer(config)
+        logger.info("Spotify player ready")
+        return player
+    except Exception as exc:
+        logger.warn("Spotify init failed: %s", exc)
+        return None
+
+
 def main():
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
 
-    # --- Load config ---
     config = Config()
 
-    # --- Init hardware ---
+    # --- Wait for NFC reader hardware ---
     logger.info("Initializing NFC reader …")
-    nfc = NFCReader()
+    nfc = _init_nfc()
+    while nfc is None and not _shutdown:
+        logger.info("Retrying NFC init in %ds … (is the PN532 connected?)", NFC_RETRY_INTERVAL)
+        time.sleep(NFC_RETRY_INTERVAL)
+        nfc = _init_nfc()
 
-    # --- Init Spotify ---
+    if _shutdown:
+        return
+
+    # --- Init Spotify (retry until available) ---
     logger.info("Connecting to Spotify API …")
-    spotify = SpotifyPlayer(config)
+    spotify = _init_spotify(config)
+    while spotify is None and not _shutdown:
+        logger.info("Retrying Spotify init in %ds …", NFC_RETRY_INTERVAL)
+        time.sleep(NFC_RETRY_INTERVAL)
+        spotify = _init_spotify(config)
+
+    if _shutdown:
+        return
 
     logger.info("NFC Player ready – waiting for tags …")
 
@@ -47,7 +84,6 @@ def main():
         try:
             uid = nfc.wait_for_tag(timeout=0.5)
             if uid is None:
-                # No tag present
                 time.sleep(0.1)
                 continue
 
@@ -55,19 +91,17 @@ def main():
 
             uri = nfc.read_spotify_uri(uid, config.nfc_tags)
             if uri is None:
-                logger.warning("Unknown tag %s – ignoring", uid)
+                logger.warn("Unknown tag %s – ignoring", uid)
                 nfc.wait_for_removal()
                 last_uri = None
                 continue
 
-            # Only start playback if it's a new URI
             if uri != last_uri:
                 spotify.play(uri)
                 last_uri = uri
             else:
                 logger.info("Same tag – playback continues")
 
-            # Wait until the tag is removed
             nfc.wait_for_removal()
             logger.info("Tag removed")
 
