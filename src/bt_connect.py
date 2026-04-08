@@ -109,6 +109,18 @@ def _ensure_bt_ready():
         logger.warn("bluetoothctl power on failed: %s", result.stderr.strip())
 
 
+def trust_all_speakers(speakers):
+    """Trust every configured speaker so BlueZ auto-accepts reconnections."""
+    for speaker in speakers:
+        mac = speaker["mac"]
+        name = speaker.get("name", mac)
+        result = _run(["bluetoothctl", "trust", mac])
+        if result.returncode == 0:
+            logger.info("Trusted %s (%s)", name, mac)
+        else:
+            logger.debug("Trust command for %s returned %d", mac, result.returncode)
+
+
 def connect(mac):
     """Trust and connect to an already-paired device."""
     logger.info("Attempting connection to %s …", mac)
@@ -122,10 +134,7 @@ def connect(mac):
         )
         return False
 
-    # Trust so BlueZ auto-accepts future connections
-    _run(["bluetoothctl", "trust", mac])
-
-    # Connect
+    # Connect (trust already handled by trust_all_speakers at startup)
     result = _run(["bluetoothctl", "connect", mac], timeout=15)
     time.sleep(SETTLE_TIME)
 
@@ -148,6 +157,7 @@ def main():
         logger.info("Configured speakers (by priority):")
         for s in speakers:
             logger.info("  [prio %d] %s (%s)", s.get("priority", 0), s.get("name", "?"), s["mac"])
+        trust_all_speakers(speakers)
     else:
         logger.info("No valid speakers configured – waiting for config update …")
 
@@ -162,6 +172,7 @@ def main():
             if new_speakers != speakers:
                 speakers = new_speakers
                 logger.info("Config reloaded – %d speaker(s)", len(speakers))
+                trust_all_speakers(speakers)
             last_config_load = time.time()
 
         if not speakers:
