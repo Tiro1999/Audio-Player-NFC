@@ -112,6 +112,14 @@ def main():
                 spotify.pause()
                 last_uri = None
 
+        except OSError as exc:
+            # I2C bus errors → PN532 needs full re-init
+            logger.warn("I2C error: %s – reinitializing NFC reader …", exc)
+            time.sleep(1)
+            nfc = _init_nfc()
+            if nfc is None:
+                logger.warn("NFC re-init failed, retrying in %ds …", NFC_RETRY_INTERVAL)
+                time.sleep(NFC_RETRY_INTERVAL)
         except KeyboardInterrupt:
             break
         except Exception as exc:
