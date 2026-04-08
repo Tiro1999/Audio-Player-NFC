@@ -112,24 +112,37 @@ Perfekt für unterwegs, wenn kein festes WiFi verfügbar ist:
 
 ### 2.4 WiFi per NFC Tag (Bonus!)
 
-> **Status: Idee / Zukunfts-Feature** – aktuell noch nicht automatisch implementiert.
-> Du kannst aber jetzt schon einen NFC Tag mit WiFi-Daten beschreiben und manuell nutzen.
+Die eleganteste Variante: Einen NFC Tag mit WiFi-Daten beschreiben und einfach
+an den Player halten – der Pi verbindet sich automatisch!
 
-Die elegante Variante: Einen NFC Tag mit WiFi-Daten beschreiben, den du bei Freunden
-einfach an den Player hältst.
+**So funktioniert es:**
 
-**So würde es funktionieren:**
-1. Auf dem Handy mit einer NFC-Writer-App (z.B. *NFC Tools*) einen Tag beschreiben:
-   - Typ: **WiFi** (oder Text mit `WIFI:S:FreundesWiFi;T:WPA;P:DasPasswort;;`)
-2. Tag an den NFC Reader halten
-3. Der Player erkennt den WiFi-Tag und verbindet sich automatisch
+1. **NFC Tag beschreiben** – mit einer NFC-Writer-App auf dem Handy (z.B. *NFC Tools*):
+   - App öffnen → „Schreiben" → „Datensatz hinzufügen" → **WiFi**
+   - SSID und Passwort des Netzwerks eingeben → „Schreiben" → Tag auflegen
+   - **Alternativ:** Typ „Text" wählen und eingeben:
+     `WIFI:S:FreundesWiFi;T:WPA;P:DasPasswort;;`
 
-**Manueller Workaround für jetzt:**
-Einen NFC Tag mit dem WiFi-Info-Text beschreiben und dann per SSH:
-```bash
-python3 ~/nfc-player/tools/wifi_tools.py add "FreundesSSID" "Passwort" --priority 7
-python3 ~/nfc-player/tools/wifi_tools.py apply
-```
+2. **Tag an den NFC Reader halten** → der Player:
+   - 📶 Erkennt automatisch, dass es ein WiFi-Tag ist (kein Spotify-Tag)
+   - Hasht das Passwort und speichert das Netzwerk in `config.json`
+   - Fügt es in NetworkManager hinzu
+   - Verbindet sich sofort (wenn in Reichweite)
+
+3. **Fertig!** Das Netzwerk bleibt gespeichert und der Pi verbindet sich
+   beim nächsten Start automatisch, wenn es verfügbar ist.
+
+> **💡 Pro-Tipp:** Schreibe einen WiFi-Tag für **jedes** Netzwerk, das du regelmäßig
+> nutzt (Zuhause, Eltern, Freunde, Hotspot). Dann musst du nie wieder SSH nutzen,
+> um ein WiFi einzurichten!
+
+> **ℹ️ Hinweis:** WiFi-Tags werden mit Priorität 5 gespeichert. Wenn du eine andere
+> Priorität möchtest, kannst du sie nachträglich per SSH anpassen:
+> ```bash
+> python3 ~/nfc-player/tools/wifi_tools.py list          # Netzwerke anzeigen
+> python3 ~/nfc-player/tools/wifi_tools.py add "SSID" "PW" --priority 10  # Priorität ändern
+> python3 ~/nfc-player/tools/wifi_tools.py apply
+> ```
 
 ---
 

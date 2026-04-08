@@ -150,6 +150,126 @@ def _extract_ndef_uri(raw):
 
 
 # ---------------------------------------------------------------------------
+# WiFi NDEF helpers
+# ---------------------------------------------------------------------------
+
+def _strip_ndef_tlv(raw):
+    """Strip NDEF Message TLV wrapper (type 0x03) if present."""
+    if raw and raw[0] == 0x03:
+        length = raw[1]
+        start = 2
+        if length == 0xFF:
+            length = int.from_bytes(raw[2:4], "big")
+            start = 4
+        return raw[start:start + length]
+    return raw
+
+
+def _parse_wifi_string(text):
+    """Parse 'WIFI:T:WPA;S:MySSID;P:MyPass;;' → dict or None.
+
+    Supports the Wi-Fi Simple Configuration string format.
+    Fields can appear in any order; backslash-escaped special characters.
+    """
+    text = text.strip()
+    if not text.upper().startswith("WIFI:"):
+        return None
+
+    body = text[5:]
+    fields = {}
+
+    # Split on unescaped semicolons
+    i = 0
+    current = ""
+    while i < len(body):
+        if body[i] == "\\" and i + 1 < len(body):
+            current += body[i + 1]
+            i += 2
+        elif body[i] == ";":
+            if ":" in current:
+                key, _, value = current.partition(":")
+                fields[key.upper()] = value
+            current = ""
+            i += 1
+        else:
+            current += body[i]
+            i += 1
+
+    if current and ":" in current:
+        key, _, value = current.partition(":")
+        fields[key.upper()] = value
+
+    ssid = fields.get("S")
+    if not ssid:
+        return None
+
+    return {
+        "type": "wifi",
+        "ssid": ssid,
+        "password": fields.get("P", ""),
+        "security": fields.get("T", "WPA"),
+        "hidden": fields.get("H", "false").lower() == "true",
+    }
+
+
+def _extract_tag_data(raw):
+    """Parse NDEF records and return structured tag data.
+
+    Returns one of:
+        {"type": "wifi", "ssid": ..., "password": ..., "security": ..., "hidden": ...}
+        {"type": "spotify", "uri": "spotify:..."}
+        None
+    """
+    try:
+        import ndef as ndeflib
+
+        raw = _strip_ndef_tlv(raw)
+        records = list(ndeflib.message_decoder(raw))
+
+        # First pass: WiFi records (WSC MIME or text/URI with WIFI: prefix)
+        for record in records:
+            if hasattr(record, "credential") and record.credential:
+                cred = record.credential[0]
+                ssid = getattr(cred, "network_name", "") or ""
+                key = getattr(cred, "network_key", "") or ""
+                if ssid:
+                    return {
+                        "type": "wifi",
+                        "ssid": ssid,
+                        "password": key,
+                        "security": "WPA",
+                        "hidden": False,
+                    }
+
+            text = None
+            if hasattr(record, "text"):
+                text = record.text
+            elif hasattr(record, "uri"):
+                text = record.uri
+            if text and text.strip().upper().startswith("WIFI:"):
+                result = _parse_wifi_string(text)
+                if result:
+                    return result
+
+        # Second pass: Spotify records
+        for record in records:
+            uri = None
+            if hasattr(record, "uri"):
+                uri = record.uri
+            elif hasattr(record, "text"):
+                uri = record.text
+            if uri:
+                converted = spotify_url_to_uri(uri)
+                if converted:
+                    return {"type": "spotify", "uri": converted}
+
+    except Exception as exc:
+        logger.debug("NDEF parse failed (%s)", exc)
+
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -198,6 +318,46 @@ class NFCReader:
             return resolved
 
         logger.debug("No URI mapping for tag %s", uid_hex)
+        return None
+
+    def read_tag(self, uid_hex, nfc_tags_map):
+        """Read tag and return an action dict, or None.
+
+        Returns one of:
+            {"type": "spotify", "uri": "spotify:track:xxx"}
+            {"type": "wifi", "ssid": "...", "password": "...", ...}
+            None
+        """
+        # 1. NDEF
+        try:
+            raw = _read_tag_user_memory(self.pn532)
+            if raw:
+                logger.trace("Raw NDEF (%d bytes): %s…", len(raw), raw[:64].hex())
+                data = _extract_tag_data(raw)
+                if data:
+                    if data["type"] == "wifi":
+                        logger.info("📶 WiFi tag: SSID=%s", data["ssid"])
+                        return data
+                    if data["type"] == "spotify":
+                        if not is_valid_spotify_uri(data["uri"]):
+                            logger.warn("NDEF URI rejected (not Spotify): %s", data["uri"])
+                            return None
+                        logger.info("🎵 NDEF URI: %s", data["uri"])
+                        return data
+        except Exception as exc:
+            logger.debug("NDEF read failed: %s", exc)
+
+        # 2. UID lookup (Spotify only)
+        uri = nfc_tags_map.get(uid_hex)
+        if uri:
+            resolved = spotify_url_to_uri(uri) or uri
+            if not is_valid_spotify_uri(resolved):
+                logger.warn("Config URI rejected (not Spotify): %s", resolved)
+                return None
+            logger.info("UID %s → %s (config)", uid_hex, resolved)
+            return {"type": "spotify", "uri": resolved}
+
+        logger.debug("No mapping for tag %s", uid_hex)
         return None
 
     def wait_for_removal(self, poll_interval=0.3, timeout=0.5, consecutive_misses=3):
