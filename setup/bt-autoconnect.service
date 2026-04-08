@@ -14,7 +14,7 @@ Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
 Environment=XDG_RUNTIME_DIR=/run/user/__UID__
-Environment=PULSE_RUNTIME_PATH=/run/user/__UID__/pulse
+Environment=PULSE_SERVER=unix:/run/user/__UID__/pulse/native
 
 [Install]
 WantedBy=multi-user.target

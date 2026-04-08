@@ -111,13 +111,19 @@ LIBRESPOT_BITRATE="160"
 LIBRESPOT_QUIET=
 EOF
 
-# Raspotify needs to share PulseAudio with our user
+# Raspotify needs to share PulseAudio with our user.
+# We use TCP (127.0.0.1:4713) because the Unix socket is unreliable
+# for system services – PulseAudio may exit while idle, leaving a stale socket.
 sudo mkdir -p /etc/systemd/system/raspotify.service.d
 sudo tee /etc/systemd/system/raspotify.service.d/override.conf > /dev/null <<EOF
 [Service]
 User=$CURRENT_USER
-Environment=PULSE_RUNTIME_PATH=/run/user/$(id -u)/pulse
+Environment=XDG_RUNTIME_DIR=/run/user/$(id -u)
+Environment=PULSE_SERVER=tcp:127.0.0.1
 EOF
+
+echo "Raspotify override:"
+sudo cat /etc/systemd/system/raspotify.service.d/override.conf
 
 # ------------------------------------------------------------------
 # 6. PulseAudio for headless Bluetooth audio
@@ -127,21 +133,38 @@ sudo loginctl enable-linger "$CURRENT_USER"
 sudo usermod -a -G bluetooth "$CURRENT_USER"
 
 mkdir -p "$USER_HOME/.config/pulse"
-# Enable bluetooth module auto-loading + auto-switch to new devices
-if ! grep -q "module-switch-on-connect" "$USER_HOME/.config/pulse/default.pa" 2>/dev/null; then
-    cat > "$USER_HOME/.config/pulse/default.pa" <<'EOF'
+
+# Prevent PulseAudio from auto-exiting when idle (critical for Raspotify!)
+cat > "$USER_HOME/.config/pulse/daemon.conf" <<'EOF'
+# Managed by NFC-Player install script
+exit-idle-time = -1
+flat-volumes = no
+EOF
+
+# Enable bluetooth modules + TCP listener for Raspotify (system service)
+cat > "$USER_HOME/.config/pulse/default.pa" <<'EOF'
 .include /etc/pulse/default.pa
 load-module module-bluetooth-discover
 load-module module-bluetooth-policy
 load-module module-switch-on-connect
+# TCP listener on localhost for Raspotify (system service can't use Unix socket reliably)
+load-module module-native-protocol-tcp auth-ip-acl=127.0.0.1 auth-anonymous=1
 EOF
-fi
 
-# Start PulseAudio user service (restart to pick up new config)
-systemctl --user enable pulseaudio || true
-systemctl --user restart pulseaudio || true
-# Give PA a moment to fully start
-sleep 2
+# Enable PulseAudio socket activation + service (for headless operation)
+systemctl --user enable pulseaudio.socket pulseaudio.service || true
+systemctl --user restart pulseaudio.socket || true
+systemctl --user restart pulseaudio.service || true
+# Give PA a moment to fully start and open TCP port
+sleep 3
+
+# Verify PulseAudio is running and TCP listener works
+if pactl info &>/dev/null; then
+    echo "PulseAudio running ✅"
+    echo "  Default sink: $(pactl get-default-sink 2>/dev/null || echo 'unknown')"
+else
+    echo "⚠️  PulseAudio not responding – check 'systemctl --user status pulseaudio'"
+fi
 
 # ------------------------------------------------------------------
 # 7. Install systemd services
@@ -207,10 +230,36 @@ echo "Login banner & aliases added to $BASHRC"
 # 9. Start services now
 # ------------------------------------------------------------------
 echo -e "\n>>> Starting services …"
+
+# Ensure PulseAudio is alive before starting audio services
+systemctl --user restart pulseaudio.service || true
+sleep 2
+
+# Verify PulseAudio TCP listener is active
+if pactl info &>/dev/null; then
+    echo "  PulseAudio:     ✅ running"
+else
+    echo "  PulseAudio:     ❌ NOT responding – audio will not work!"
+fi
+
+# 1. BT first – needs time to connect speaker + set PulseAudio sink
 sudo systemctl restart bt-autoconnect.service
+echo "  ⏳ Waiting for Bluetooth connection …"
+sleep 8
+
+# 2. Raspotify – needs PulseAudio + BT sink available
 sudo systemctl restart raspotify.service
-# Small delay to let BT + Raspotify settle before NFC player starts
-sleep 3
+sleep 5
+
+# Check if Raspotify survived startup (didn't crash)
+if systemctl is-active --quiet raspotify; then
+    echo "  Raspotify:      ✅ running"
+else
+    echo "  Raspotify:      ❌ CRASHED – checking logs:"
+    journalctl -u raspotify --no-pager -n 5 | sed 's/^/    /'
+fi
+
+# 3. NFC Player last – needs Raspotify device to be visible
 sudo systemctl restart nfc-player.service
 
 echo -e "\n>>> Service status:"
