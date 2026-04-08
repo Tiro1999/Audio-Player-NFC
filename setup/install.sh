@@ -65,13 +65,11 @@ echo "Bluetooth unblocked (persisted in /etc/rc.local)"
 # ------------------------------------------------------------------
 
 # ------------------------------------------------------------------
-# 3. Create log file
+# 3. Create log directory (inside project, no /var/log permissions needed)
 # ------------------------------------------------------------------
-echo -e "\n>>> Creating log file …"
-sudo touch /var/log/nfc_player.log
-sudo chown "$CURRENT_USER":"$CURRENT_USER" /var/log/nfc_player.log
-sudo chmod 644 /var/log/nfc_player.log
-echo "Log file: /var/log/nfc_player.log"
+echo -e "\n>>> Creating log directory …"
+mkdir -p "$PROJECT_DIR/logs"
+echo "Log directory: $PROJECT_DIR/logs/"
 
 # ------------------------------------------------------------------
 # 4. Python virtual environment

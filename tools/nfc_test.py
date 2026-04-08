@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# --- Auto-activate project venv if available ---
+import os, sys
+_venv_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "venv", "bin", "python3")
+if os.path.exists(_venv_py) and os.path.abspath(sys.executable) != os.path.abspath(_venv_py):
+    os.execv(_venv_py, [_venv_py] + sys.argv)
+# -----------------------------------------------
 """Simulate an NFC tag read – test the full Spotify flow without hardware.
 
 Usage (on the Pi via SSH):
@@ -12,8 +18,6 @@ Useful for testing while the PN532 module hasn't arrived yet.
 """
 
 import argparse
-import os
-import sys
 
 # Add project root to path so we can import src.*
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))

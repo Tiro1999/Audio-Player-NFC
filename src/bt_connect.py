@@ -17,7 +17,7 @@ from .logger import Logger
 logger = Logger(__name__)
 
 CONFIG_PATHS = ["/boot/firmware/config.json", "/boot/config.json"]
-RETRY_INTERVAL = 5   # seconds between connection checks
+RETRY_INTERVAL = 10   # seconds between connection checks
 SETTLE_TIME = 3       # seconds to wait after a connect attempt
 CONFIG_RELOAD_INTERVAL = 60  # re-read config every N seconds
 
@@ -36,11 +36,15 @@ def load_speakers():
     for path in CONFIG_PATHS:
         try:
             with open(path) as f:
-                bt = json.load(f).get("bluetooth", {})
+                data = json.load(f)
+                bt = data.get("bluetooth", {})
+                logger.debug("Config loaded from %s", path)
                 break
-        except (FileNotFoundError, KeyError):
+        except (FileNotFoundError, KeyError, json.JSONDecodeError) as exc:
+            logger.debug("Skipping %s: %s", path, exc)
             continue
     else:
+        logger.warn("No config file found in %s", CONFIG_PATHS)
         return []
 
     if "speakers" in bt:
@@ -52,6 +56,7 @@ def load_speakers():
             "priority": 10,
         }]
     else:
+        logger.warn("No speakers section in config")
         return []
 
     # Filter out placeholder/invalid MACs
@@ -60,11 +65,17 @@ def load_speakers():
     if skipped > 0:
         logger.debug("Skipped %d placeholder speaker(s)", skipped)
 
+    logger.debug("Loaded %d valid speaker(s)", len(valid))
     return sorted(valid, key=lambda s: s.get("priority", 0), reverse=True)
 
 
-def _run(cmd):
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+def _run(cmd, timeout=15):
+    """Run a command and return the CompletedProcess result."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        logger.debug("Command timed out: %s", " ".join(cmd))
+        return subprocess.CompletedProcess(cmd, 1, "", "timeout")
 
 
 def is_connected(mac):
@@ -75,23 +86,56 @@ def is_connected(mac):
         return False
 
 
+def _is_paired(mac):
+    """Check if a device is already paired."""
+    try:
+        result = _run(["bluetoothctl", "info", mac])
+        return "Paired: yes" in result.stdout
+    except Exception:
+        return False
+
+
 def _ensure_bt_ready():
-    """Unblock and power on the Bluetooth adapter."""
+    """Unblock and power on the Bluetooth adapter.
+
+    rfkill is handled by ExecStartPre (as root) when running as a service.
+    When run manually, we try with and without sudo.
+    """
+    subprocess.run(["rfkill", "unblock", "bluetooth"], capture_output=True)
     subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"], capture_output=True)
     time.sleep(0.5)
-    _run(["bluetoothctl", "power", "on"])
+    result = _run(["bluetoothctl", "power", "on"])
+    if result.returncode != 0:
+        logger.warn("bluetoothctl power on failed: %s", result.stderr.strip())
 
 
 def connect(mac):
-    logger.info("Attempting connection to %s", mac)
+    """Trust and connect to an already-paired device."""
+    logger.info("Attempting connection to %s …", mac)
     _ensure_bt_ready()
-    _run(["bluetoothctl", "connect", mac])
+
+    if not _is_paired(mac):
+        logger.warn(
+            "Device %s is NOT paired. "
+            "Run: python3 ~/nfc-player/tools/bt_tools.py connect %s --priority 10",
+            mac, mac,
+        )
+        return False
+
+    # Trust so BlueZ auto-accepts future connections
+    _run(["bluetoothctl", "trust", mac])
+
+    # Connect
+    result = _run(["bluetoothctl", "connect", mac], timeout=15)
     time.sleep(SETTLE_TIME)
 
+    if is_connected(mac):
+        logger.info("Connected to %s", mac)
+        return True
 
-def ensure_trusted(mac):
-    """Mark the device as trusted so BlueZ will accept it automatically."""
-    _run(["bluetoothctl", "trust", mac])
+    err = (result.stdout + result.stderr).strip()
+    logger.warn("Connection to %s failed: %s", mac, err or "(no details)")
+    return False
 
 
 def main():
@@ -104,8 +148,6 @@ def main():
         logger.info("Configured speakers (by priority):")
         for s in speakers:
             logger.info("  [prio %d] %s (%s)", s.get("priority", 0), s.get("name", "?"), s["mac"])
-        for s in speakers:
-            ensure_trusted(s["mac"])
     else:
         logger.info("No valid speakers configured – waiting for config update …")
 
@@ -120,8 +162,6 @@ def main():
             if new_speakers != speakers:
                 speakers = new_speakers
                 logger.info("Config reloaded – %d speaker(s)", len(speakers))
-                for s in speakers:
-                    ensure_trusted(s["mac"])
             last_config_load = time.time()
 
         if not speakers:
@@ -143,17 +183,14 @@ def main():
             mac = speaker["mac"]
             name = speaker.get("name", mac)
             prio = speaker.get("priority", 0)
-            logger.info("Trying %s (%s, prio %d)", name, mac, prio)
+            logger.info("Trying %s (%s, prio %d) …", name, mac, prio)
 
-            connect(mac)
-
-            if is_connected(mac):
-                logger.info("Connected to %s (%s)", name, mac)
+            if connect(mac):
                 connected_mac = mac
                 connected_name = name
                 break
         else:
-            logger.debug("No speakers available – retrying in %ds", RETRY_INTERVAL)
+            logger.warn("Could not connect to any speaker – retrying in %ds", RETRY_INTERVAL)
 
         time.sleep(RETRY_INTERVAL)
 

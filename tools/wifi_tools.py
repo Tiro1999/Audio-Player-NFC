@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# --- Auto-activate project venv if available ---
+import os, sys
+_venv_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "venv", "bin", "python3")
+if os.path.exists(_venv_py) and os.path.abspath(sys.executable) != os.path.abspath(_venv_py):
+    os.execv(_venv_py, [_venv_py] + sys.argv)
+# -----------------------------------------------
 """WiFi management tools – add networks with hashed passwords.
 
 Passwords are converted to a WPA2 PSK hash (PBKDF2-SHA1, same as

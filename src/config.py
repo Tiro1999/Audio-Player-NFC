@@ -112,9 +112,28 @@ class Config:
     # --- Spotify token cache ---
     @property
     def spotify_cache_path(self):
-        """Return the path to the Spotify OAuth token cache file."""
-        for p in ["/boot/firmware/spotify_cache", "/boot/spotify_cache"]:
-            if os.path.exists(p):
-                return p
-        # Default write location
-        return "/boot/firmware/spotify_cache"
+        """Return the path to the Spotify OAuth token cache file.
+
+        Prefers the project-local cache (writable without sudo).
+        Auto-migrates from boot partition on first use.
+        """
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        local_cache = os.path.join(project_dir, "spotify_cache")
+
+        # Prefer local (writable) cache
+        if os.path.exists(local_cache):
+            return local_cache
+
+        # Migrate from boot partition if available
+        for boot_path in ["/boot/firmware/spotify_cache", "/boot/spotify_cache"]:
+            if os.path.exists(boot_path):
+                try:
+                    import shutil
+                    shutil.copy2(boot_path, local_cache)
+                    logger.info("Migrated spotify_cache from %s → %s", boot_path, local_cache)
+                    return local_cache
+                except (PermissionError, OSError):
+                    return boot_path
+
+        # Default: write to project directory
+        return local_cache

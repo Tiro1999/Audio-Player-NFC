@@ -13,11 +13,12 @@ Usage::
 
 Log output goes to:
   • stdout  – colored, human-friendly
-  • /var/log/nfc_player.log – plain text, rotated at 5 MB (3 backups)
+  • ~/nfc-player/logs/nfc_player.log – plain text, rotated at 5 MB (3 backups)
 """
 
 import logging
 import os
+import pathlib
 from logging.handlers import RotatingFileHandler
 
 # ── Custom TRACE level (below DEBUG) ──────────────────────────────────────
@@ -25,7 +26,10 @@ TRACE = 5
 logging.addLevelName(TRACE, "TRACE")
 
 # ── Configuration ─────────────────────────────────────────────────────────
-LOG_FILE = "/var/log/nfc_player.log"
+_SRC_DIR = pathlib.Path(__file__).resolve().parent
+_PROJECT_DIR = _SRC_DIR.parent
+LOG_DIR = str(_PROJECT_DIR / "logs")
+LOG_FILE = str(_PROJECT_DIR / "logs" / "nfc_player.log")
 MAX_LOG_BYTES = 5 * 1024 * 1024   # 5 MB per file
 LOG_BACKUP_COUNT = 3               # keep 3 rotated backups
 
@@ -88,9 +92,7 @@ class Logger:
 
         # ── File handler (rotating, plain text) ───────────────────────
         try:
-            log_dir = os.path.dirname(LOG_FILE)
-            if log_dir:
-                os.makedirs(log_dir, exist_ok=True)
+            os.makedirs(LOG_DIR, exist_ok=True)
             fh = RotatingFileHandler(
                 LOG_FILE,
                 maxBytes=MAX_LOG_BYTES,

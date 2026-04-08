@@ -6,4 +6,5 @@ venv/
 spotify_cache
 .env
 config.json
+logs/
 /hardware-docs/private-res/

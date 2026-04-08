@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+# --- Auto-activate project venv if available ---
+import os, sys
+_venv_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "venv", "bin", "python3")
+if os.path.exists(_venv_py) and os.path.abspath(sys.executable) != os.path.abspath(_venv_py):
+    os.execv(_venv_py, [_venv_py] + sys.argv)
+# -----------------------------------------------
 """Bluetooth tools for the NFC Spotify Player.
 
 Run on the Pi via SSH:
@@ -140,6 +146,12 @@ def cmd_connect(args):
     identifier = args.identifier
     priority = args.priority
 
+    # Ensure BT is ready
+    subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"], capture_output=True)
+    time.sleep(0.5)
+    _run(["bluetoothctl", "power", "on"])
+    time.sleep(1)
+
     # Resolve MAC and name
     mac, name = _resolve_device(identifier)
     if not mac:
@@ -148,21 +160,70 @@ def cmd_connect(args):
 
     print(f"🔗  Connecting to {name} ({mac}) …")
 
-    _run(["bluetoothctl", "pair", mac])
-    time.sleep(1)
-    _run(["bluetoothctl", "trust", mac])
-    time.sleep(1)
-    _run(["bluetoothctl", "connect", mac])
-    time.sleep(3)
+    # Use interactive bluetoothctl for reliable pair + trust + connect
+    # Step 1: BR/EDR scan to ensure device is in BlueZ cache
+    print(f"    Scanning for device …")
+    proc = subprocess.Popen(
+        ["bluetoothctl"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    commands = (
+        "menu scan\n"
+        "transport bredr\n"
+        "back\n"
+        "scan on\n"
+    )
+    proc.stdin.write(commands)
+    proc.stdin.flush()
+    time.sleep(8)
 
-    # Verify
+    # Step 2: Pair + Trust + Connect (all in same session)
+    print(f"    Pairing …")
+    proc.stdin.write(f"scan off\npair {mac}\n")
+    proc.stdin.flush()
+    time.sleep(8)
+
+    proc.stdin.write(f"trust {mac}\n")
+    proc.stdin.flush()
+    time.sleep(1)
+
+    print(f"    Connecting …")
+    proc.stdin.write(f"connect {mac}\n")
+    proc.stdin.flush()
+    time.sleep(5)
+
+    proc.stdin.write("exit\n")
+    proc.stdin.flush()
+    try:
+        proc.communicate(timeout=5)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+
+    # Verify results
     info = _run(["bluetoothctl", "info", mac])
     connected = "Connected: yes" in info.stdout
+    paired = "Paired: yes" in info.stdout
+    trusted = "Trusted: yes" in info.stdout
+
+    # Get the resolved name from BlueZ (now that it knows the device)
+    m = re.search(r"Name:\s+(.+)", info.stdout)
+    if m:
+        resolved_name = m.group(1).strip()
+        if resolved_name and resolved_name != mac:
+            name = resolved_name
 
     if connected:
         print(f"✅  Connected to {name}!")
+    elif paired:
+        print(f"🔗  Paired with {name} (not connected – speaker may have turned off)")
     else:
-        print(f"⚠️   Connection status unclear – device may need to be in pairing mode")
+        print(f"⚠️   Pairing failed – make sure {name} is in Pairing-Modus (blinkende LED)")
+        print(f"    Manual fallback:  bluetoothctl → pair {mac}")
+
+    print(f"    Status: paired={paired}, trusted={trusted}, connected={connected}")
 
     # Save to config.json
     config, config_path = _load_config()
