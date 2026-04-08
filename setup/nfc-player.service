@@ -1,6 +1,6 @@
 [Unit]
 Description=NFC Spotify Player
-After=network-online.target bluetooth.target pulseaudio.service raspotify.service
+After=network-online.target bluetooth.target raspotify.service
 Wants=network-online.target
 
 [Service]

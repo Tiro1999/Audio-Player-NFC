@@ -94,9 +94,12 @@ fi
 
 # ── Spotify token cache (only if local file exists) ────────────────────────
 if [ -f spotify_cache ]; then
-    echo "🔑  Copying spotify_cache → /boot/firmware/ …"
+    echo "🔑  Copying spotify_cache → Pi …"
+    # Primary: project directory (writable, used by code)
+    scp $SSH_OPTS spotify_cache "$TARGET:$REMOTE_DIR/spotify_cache"
+    # Legacy: boot partition (auto-migrated on first run)
     scp $SSH_OPTS spotify_cache "$TARGET:$REMOTE_DIR/spotify_cache.tmp"
-    ssh $SSH_OPTS "$TARGET" "sudo cp $REMOTE_DIR/spotify_cache.tmp /boot/firmware/spotify_cache && rm $REMOTE_DIR/spotify_cache.tmp"
+    ssh $SSH_OPTS "$TARGET" "sudo cp $REMOTE_DIR/spotify_cache.tmp /boot/firmware/spotify_cache && rm $REMOTE_DIR/spotify_cache.tmp" 2>/dev/null || true
 fi
 
 echo ""

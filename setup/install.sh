@@ -157,20 +157,82 @@ sudo systemctl enable bt-autoconnect.service
 sudo systemctl enable nfc-player.service
 
 # ------------------------------------------------------------------
-# 8. Reminder: config & token
+# 8. Shell aliases & login status banner
+# ------------------------------------------------------------------
+echo -e "\n>>> Setting up shell aliases & login banner …"
+
+BASHRC="$USER_HOME/.bashrc"
+MARKER="# --- NFC Spotify Player ---"
+
+# Remove any previous NFC Player block, then append fresh
+if grep -q "$MARKER" "$BASHRC" 2>/dev/null; then
+    sed -i "/$MARKER/,/# --- END NFC Spotify Player ---/d" "$BASHRC"
+fi
+
+cat >> "$BASHRC" <<'BASHEOF'
+# --- NFC Spotify Player ---
+alias nfc-log='tail -f ~/nfc-player/logs/nfc_player.log'
+alias nfc-restart='sudo systemctl restart nfc-player bt-autoconnect && echo "✅ Services restarted"'
+alias nfc-status='systemctl status nfc-player bt-autoconnect raspotify --no-pager -l'
+alias nfc-test='python3 ~/nfc-player/tools/nfc_test.py'
+alias nfc-bt='python3 ~/nfc-player/tools/bt_tools.py'
+
+# Login banner (only for interactive shells)
+if [ -t 0 ] && [ -z "${_NFC_BANNER_SHOWN:-}" ]; then
+    export _NFC_BANNER_SHOWN=1
+    echo ""
+    echo "🎵  NFC Spotify Player"
+    echo "──────────────────────────────────"
+    systemctl is-active --quiet nfc-player     && echo "  NFC Player:     ✅ running" || echo "  NFC Player:     ❌ stopped"
+    systemctl is-active --quiet bt-autoconnect && echo "  BT AutoConnect: ✅ running" || echo "  BT AutoConnect: ❌ stopped"
+    systemctl is-active --quiet raspotify      && echo "  Raspotify:      ✅ running" || echo "  Raspotify:      ❌ stopped"
+    echo ""
+    echo "  📋  Letzte Log-Einträge:"
+    tail -5 ~/nfc-player/logs/nfc_player.log 2>/dev/null | sed 's/^/    /' || echo "    (noch kein Log)"
+    echo ""
+    echo "  Befehle: nfc-log · nfc-status · nfc-restart · nfc-test · nfc-bt"
+    echo "──────────────────────────────────"
+    echo ""
+fi
+# --- END NFC Spotify Player ---
+BASHEOF
+
+echo "Login banner & aliases added to $BASHRC"
+
+# ------------------------------------------------------------------
+# 9. Start services now
+# ------------------------------------------------------------------
+echo -e "\n>>> Starting services …"
+sudo systemctl restart bt-autoconnect.service
+sudo systemctl restart raspotify.service
+# Small delay to let BT + Raspotify settle before NFC player starts
+sleep 3
+sudo systemctl restart nfc-player.service
+
+echo -e "\n>>> Service status:"
+systemctl is-active --quiet bt-autoconnect && echo "  BT AutoConnect: ✅ running" || echo "  BT AutoConnect: ❌ stopped"
+systemctl is-active --quiet raspotify      && echo "  Raspotify:      ✅ running" || echo "  Raspotify:      ❌ stopped"
+systemctl is-active --quiet nfc-player     && echo "  NFC Player:     ✅ running" || echo "  NFC Player:     ❌ stopped"
+
+# ------------------------------------------------------------------
+# 10. Done
 # ------------------------------------------------------------------
 echo ""
 echo "========================================"
 echo "  ✅  Installation complete!"
 echo "========================================"
 echo ""
-echo "Before starting, make sure:"
-echo "  1. /boot/firmware/config.json exists (see config.json.example)"
-echo "  2. /boot/firmware/spotify_cache exists (run tools/spotify_auth.py on PC)"
-echo "  3. Bluetooth speaker is paired:  bluetoothctl pair <MAC>"
+echo "Voraussetzungen (einmalig):"
+echo "  1. /boot/firmware/config.json existiert (siehe config.json.example)"
+echo "  2. Spotify Token vorhanden (tools/spotify_auth.py auf dem PC ausführen)"
+echo "  3. Bluetooth Speaker gepairt:  python3 ~/nfc-player/tools/bt_tools.py connect <MAC>"
 echo ""
-echo "Then start services:"
-echo "  sudo systemctl start bt-autoconnect"
-echo "  sudo systemctl start nfc-player"
+echo "Services laufen bereits! Bei nächstem Reboot starten sie automatisch."
 echo ""
-echo "Or reboot:  sudo reboot"
+echo "Nützliche Befehle:"
+echo "  nfc-log      – Live Log-Ausgabe"
+echo "  nfc-status   – Service-Status anzeigen"
+echo "  nfc-restart  – Services neu starten"
+echo "  nfc-test     – Spotify URI Test (ohne NFC Tag)"
+echo "  nfc-bt       – Bluetooth Tools"
+echo ""
