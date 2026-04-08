@@ -40,6 +40,14 @@ NFC Tag  →  PN532 (I2C)  →  Python app
 | SDA | Pin 3 (GPIO 2) | I2C Data |
 | SCL | Pin 5 (GPIO 3) | I2C Clock |
 
+Pi Pin-Layout
+
+ 3.3V [1]  [2] 5V
+  SDA [3]  [4] 5V
+  SCL [5]  [6] GND
+      [7]  [8]
+      ...
+
 > Set the PN532 DIP switches to **I2C mode**: SEL0 = ON, SEL1 = OFF.
 
 ## Pre-Requisites
