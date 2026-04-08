@@ -85,19 +85,34 @@ def is_valid_spotify_uri(uri):
 # NDEF helpers (NTAG213 / 215 / 216)
 # ---------------------------------------------------------------------------
 
-def _read_tag_user_memory(pn532, max_pages=40):
-    """Read user memory pages (4+) from an NTAG2xx tag."""
-    data = bytearray()
-    for page in range(4, 4 + max_pages):
-        try:
-            block = pn532.ntag2xx_read_block(page)
-            if block is None:
+def _read_tag_user_memory(pn532, max_pages=40, retries=3):
+    """Read user memory pages (4+) from an NTAG2xx tag.
+
+    Retries on short reads which can happen when the tag is not yet
+    stable on the reader (I2C bus timing issues).
+    """
+    best_data = b""
+    for attempt in range(retries):
+        data = bytearray()
+        for page in range(4, 4 + max_pages):
+            try:
+                block = pn532.ntag2xx_read_block(page)
+                if block is None:
+                    break
+                data.extend(block)
+            except Exception:
                 break
-            data.extend(block)
-        except Exception:
+        if len(data) > len(best_data):
+            best_data = bytes(data)
+        # If we got a reasonable amount, accept it
+        if len(data) >= 64:
             break
-    logger.trace("Read %d bytes of tag user memory", len(data))
-    return bytes(data)
+        if attempt < retries - 1:
+            logger.debug("Short read (%d bytes), retrying…", len(data))
+            time.sleep(0.15)
+
+    logger.trace("Read %d bytes of tag user memory", len(best_data))
+    return best_data
 
 
 def _extract_ndef_uri(raw):
@@ -185,10 +200,17 @@ class NFCReader:
         logger.debug("No URI mapping for tag %s", uid_hex)
         return None
 
-    def wait_for_removal(self, poll_interval=0.3, timeout=0.5):
-        """Block until the tag is removed from the reader."""
-        while True:
+    def wait_for_removal(self, poll_interval=0.3, timeout=0.5, consecutive_misses=3):
+        """Block until the tag is removed from the reader.
+
+        Requires multiple consecutive failed reads to avoid false positives
+        caused by I2C bus glitches or brief contact loss.
+        """
+        misses = 0
+        while misses < consecutive_misses:
             uid = self.pn532.read_passive_target(timeout=timeout)
             if uid is None:
-                return
+                misses += 1
+            else:
+                misses = 0
             time.sleep(poll_interval)

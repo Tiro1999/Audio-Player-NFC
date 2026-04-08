@@ -16,6 +16,7 @@ logger = Logger("nfc-player")
 _shutdown = False
 
 NFC_RETRY_INTERVAL = 10  # seconds between NFC init retries
+REMOVAL_COOLDOWN = 1.5   # seconds after tag removal before accepting a new tag
 
 
 def _handle_signal(signum, frame):
@@ -94,6 +95,7 @@ def main():
                 logger.warn("Unknown tag %s – ignoring", uid)
                 nfc.wait_for_removal()
                 last_uri = None
+                time.sleep(REMOVAL_COOLDOWN)
                 continue
 
             if uri != last_uri:
@@ -104,6 +106,7 @@ def main():
 
             nfc.wait_for_removal()
             logger.info("Tag removed")
+            time.sleep(REMOVAL_COOLDOWN)
 
             if config.pause_on_remove:
                 spotify.pause()
