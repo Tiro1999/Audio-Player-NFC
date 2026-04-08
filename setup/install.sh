@@ -60,6 +60,11 @@ fi
 echo "Bluetooth unblocked (persisted in /etc/rc.local)"
 
 # ------------------------------------------------------------------
+# 2c. Note: /boot/firmware is FAT32 – chown/chmod are not supported.
+# Tools use 'sudo cp' fallback to write config.json on this partition.
+# ------------------------------------------------------------------
+
+# ------------------------------------------------------------------
 # 3. Create log file
 # ------------------------------------------------------------------
 echo -e "\n>>> Creating log file …"

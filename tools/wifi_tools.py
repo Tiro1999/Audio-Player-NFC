@@ -46,8 +46,17 @@ def _load_config():
 
 
 def _save_config(data, path):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    """Save config.json – uses sudo if direct write fails (boot partition)."""
+    try:
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except PermissionError:
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump(data, tmp, indent=2, ensure_ascii=False)
+            tmp_path = tmp.name
+        subprocess.run(["sudo", "cp", tmp_path, path], check=True)
+        os.unlink(tmp_path)
     print(f"💾  Saved to {path}")
 
 

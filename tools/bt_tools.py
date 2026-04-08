@@ -39,8 +39,17 @@ def _load_config():
 
 
 def _save_config(data, path):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    """Save config.json – uses sudo if direct write fails (boot partition)."""
+    try:
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except PermissionError:
+        import tempfile
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as tmp:
+            json.dump(data, tmp, indent=2, ensure_ascii=False)
+            tmp_path = tmp.name
+        subprocess.run(["sudo", "cp", tmp_path, path], check=True)
+        os.unlink(tmp_path)
     print(f"💾  Saved to {path}")
 
 
@@ -50,8 +59,14 @@ def _run(cmd, timeout=15):
 
 # ── SCAN ───────────────────────────────────────────────────────────────────
 
+def _is_random_ble(name, mac):
+    """Heuristic: device name looks like its own MAC → unnamed BLE device."""
+    normalized = mac.replace(":", "-")
+    return name == normalized or name == mac
+
+
 def cmd_scan(args):
-    """Scan for nearby Bluetooth devices."""
+    """Scan for nearby Bluetooth devices (classic BR/EDR + BLE)."""
     duration = args.duration
 
     # Ensure Bluetooth is unblocked and powered on
@@ -60,16 +75,33 @@ def cmd_scan(args):
     _run(["bluetoothctl", "power", "on"])
     time.sleep(1)
 
-    print(f"🔍  Scanning for Bluetooth devices ({duration}s) …\n")
+    # Clear cached devices from previous scans
+    old_result = _run(["bluetoothctl", "devices"])
+    for line in old_result.stdout.strip().splitlines():
+        m = re.match(r"Device\s+([0-9A-Fa-f:]{17})", line)
+        if m:
+            _run(["bluetoothctl", "remove", m.group(1)])
 
+    print(f"🔍  Scanning for Bluetooth devices ({duration}s) …")
+    print(f"    (Stelle sicher, dass der Speaker im Pairing-Modus ist!)\n")
+
+    # Use interactive bluetoothctl to set BR/EDR transport before scanning
     proc = subprocess.Popen(
-        ["bluetoothctl", "scan", "on"],
+        ["bluetoothctl"],
+        stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+    # Set scan filter to BR/EDR (classic) and then start scanning
+    commands = "menu scan\ntransport bredr\nback\nscan on\n"
+    proc.stdin.write(commands.encode())
+    proc.stdin.flush()
+
     try:
         time.sleep(duration)
     finally:
+        proc.stdin.write(b"scan off\nexit\n")
+        proc.stdin.flush()
         proc.terminate()
         proc.wait()
 
@@ -78,10 +110,18 @@ def cmd_scan(args):
     for line in result.stdout.strip().splitlines():
         m = re.match(r"Device\s+([0-9A-Fa-f:]{17})\s+(.*)", line)
         if m:
-            devices.append({"mac": m.group(1), "name": m.group(2).strip()})
+            mac = m.group(1)
+            name = m.group(2).strip()
+            if _is_random_ble(name, mac):
+                continue
+            devices.append({"mac": mac, "name": name})
 
     if not devices:
-        print("No devices found.")
+        print("No named devices found.")
+        print("\nTipps:")
+        print("  • Speaker aus- und wieder einschalten, dann Pairing-Modus aktivieren")
+        print("  • Längerer Scan: --duration 30")
+        print("  • Manuell testen: bluetoothctl → scan on → 30s warten → devices")
         return
 
     print(f"Found {len(devices)} device(s):\n")
@@ -167,10 +207,23 @@ def _resolve_device(identifier):
     """Resolve a MAC address or device name to (mac, name)."""
     if re.match(r"[0-9A-Fa-f:]{17}", identifier):
         mac = identifier.upper()
+
+        # Try bluetoothctl info first (works for paired/known devices)
         info = _run(["bluetoothctl", "info", mac])
         m = re.search(r"Name:\s+(.+)", info.stdout)
-        name = m.group(1).strip() if m else mac
-        return mac, name
+        if m:
+            return mac, m.group(1).strip()
+
+        # Fallback: check the devices list (populated by recent scan)
+        result = _run(["bluetoothctl", "devices"])
+        for line in result.stdout.strip().splitlines():
+            dm = re.match(r"Device\s+([0-9A-Fa-f:]{17})\s+(.*)", line)
+            if dm and dm.group(1).upper() == mac:
+                name = dm.group(2).strip()
+                if not _is_random_ble(name, dm.group(1)):
+                    return mac, name
+
+        return mac, mac
 
     # Search by name
     result = _run(["bluetoothctl", "devices"])
