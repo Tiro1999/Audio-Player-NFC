@@ -9,3 +9,14 @@ ToDo: Add a Hardware documentation here
 
 <img src="res/PN532_NFC-Reader.png" alt="isolated" width="200"/>
 
+
+
+## Case Prints
+
+Changelog
+
+v0.0.1
+fitting test for pi + NFC Reader Module
+
+v0.0.2
+fitting test no.2 with usb micro flot in the corner
