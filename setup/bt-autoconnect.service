@@ -13,6 +13,8 @@ ExecStart=__PROJECT_DIR__/venv/bin/python3 -m src.bt_connect
 Restart=always
 RestartSec=5
 Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/__UID__
+Environment=PULSE_RUNTIME_PATH=/run/user/__UID__/pulse
 
 [Install]
 WantedBy=multi-user.target

@@ -127,29 +127,33 @@ sudo loginctl enable-linger "$CURRENT_USER"
 sudo usermod -a -G bluetooth "$CURRENT_USER"
 
 mkdir -p "$USER_HOME/.config/pulse"
-# Enable bluetooth module auto-loading
-if ! grep -q "module-bluetooth-discover" "$USER_HOME/.config/pulse/default.pa" 2>/dev/null; then
-    cat >> "$USER_HOME/.config/pulse/default.pa" <<'EOF'
+# Enable bluetooth module auto-loading + auto-switch to new devices
+if ! grep -q "module-switch-on-connect" "$USER_HOME/.config/pulse/default.pa" 2>/dev/null; then
+    cat > "$USER_HOME/.config/pulse/default.pa" <<'EOF'
 .include /etc/pulse/default.pa
 load-module module-bluetooth-discover
 load-module module-bluetooth-policy
+load-module module-switch-on-connect
 EOF
 fi
 
-# Start PulseAudio user service
+# Start PulseAudio user service (restart to pick up new config)
 systemctl --user enable pulseaudio || true
-systemctl --user start pulseaudio || true
+systemctl --user restart pulseaudio || true
+# Give PA a moment to fully start
+sleep 2
 
 # ------------------------------------------------------------------
 # 7. Install systemd services
 # ------------------------------------------------------------------
 echo -e "\n>>> Installing systemd services …"
 
-# Patch service files with actual paths
+# Patch service files with actual paths, user, and UID
+CURRENT_UID="$(id -u)"
 sed "s|__PROJECT_DIR__|$PROJECT_DIR|g; s|__USER__|$CURRENT_USER|g" \
     "$SCRIPT_DIR/nfc-player.service" | sudo tee /etc/systemd/system/nfc-player.service > /dev/null
 
-sed "s|__PROJECT_DIR__|$PROJECT_DIR|g; s|__USER__|$CURRENT_USER|g" \
+sed "s|__PROJECT_DIR__|$PROJECT_DIR|g; s|__USER__|$CURRENT_USER|g; s|__UID__|$CURRENT_UID|g" \
     "$SCRIPT_DIR/bt-autoconnect.service" | sudo tee /etc/systemd/system/bt-autoconnect.service > /dev/null
 
 sudo systemctl daemon-reload
@@ -229,10 +233,14 @@ echo "  3. Bluetooth Speaker gepairt:  python3 ~/nfc-player/tools/bt_tools.py co
 echo ""
 echo "Services laufen bereits! Bei nächstem Reboot starten sie automatisch."
 echo ""
-echo "Nützliche Befehle:"
+echo "Nützliche Befehle (neue SSH-Session oder 'source ~/.bashrc'):"
 echo "  nfc-log      – Live Log-Ausgabe"
 echo "  nfc-status   – Service-Status anzeigen"
 echo "  nfc-restart  – Services neu starten"
 echo "  nfc-test     – Spotify URI Test (ohne NFC Tag)"
 echo "  nfc-bt       – Bluetooth Tools"
 echo ""
+
+# Try to activate aliases in current shell (won't work in subshell, but
+# covers interactive use cases)
+source "$BASHRC" 2>/dev/null || true

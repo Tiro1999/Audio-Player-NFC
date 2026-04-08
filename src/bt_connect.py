@@ -3,6 +3,9 @@
 Continuously monitors the connection to configured Bluetooth speakers
 and reconnects when the link is lost.  Supports multiple speakers with
 priority (highest priority wins).  Runs as a systemd service.
+
+After connecting, sets the PulseAudio default sink to the BT speaker
+so Raspotify routes audio through it.
 """
 
 import json
@@ -19,6 +22,7 @@ logger = Logger(__name__)
 CONFIG_PATHS = ["/boot/firmware/config.json", "/boot/config.json"]
 RETRY_INTERVAL = 10   # seconds between connection checks
 SETTLE_TIME = 3       # seconds to wait after a connect attempt
+PA_SETTLE_TIME = 2    # seconds to wait for PulseAudio to register BT sink
 CONFIG_RELOAD_INTERVAL = 60  # re-read config every N seconds
 
 _PLACEHOLDER_MACS = {"AA:BB:CC:DD:EE:FF", "00:00:00:00:00:00", "FF:FF:FF:FF:FF:FF"}
@@ -121,8 +125,35 @@ def trust_all_speakers(speakers):
             logger.debug("Trust command for %s returned %d", mac, result.returncode)
 
 
+def _set_pulseaudio_sink(mac):
+    """Set the BT speaker as PulseAudio default sink so Raspotify uses it."""
+    # PulseAudio sink name: bluez_sink.XX_XX_XX_XX_XX_XX.a2dp_sink
+    sink_name = "bluez_sink." + mac.replace(":", "_") + ".a2dp_sink"
+
+    # Wait a moment for PA to register the new BT device
+    time.sleep(PA_SETTLE_TIME)
+
+    # Try to set the default sink
+    result = _run(["pactl", "set-default-sink", sink_name])
+    if result.returncode == 0:
+        logger.info("PulseAudio default sink → %s", sink_name)
+    else:
+        # Fallback: list sinks and find any bluez sink matching this MAC
+        list_result = _run(["pactl", "list", "sinks", "short"])
+        if list_result.returncode == 0:
+            mac_underscored = mac.replace(":", "_")
+            for line in list_result.stdout.splitlines():
+                if mac_underscored in line:
+                    actual_sink = line.split()[1]
+                    _run(["pactl", "set-default-sink", actual_sink])
+                    logger.info("PulseAudio default sink → %s (fallback)", actual_sink)
+                    return
+        logger.warn("Could not set PA sink for %s (sink not found yet)", mac)
+        logger.debug("Available sinks:\n%s", list_result.stdout if list_result.returncode == 0 else "(none)")
+
+
 def connect(mac):
-    """Trust and connect to an already-paired device."""
+    """Connect to an already-paired device and route PulseAudio to it."""
     logger.info("Attempting connection to %s …", mac)
     _ensure_bt_ready()
 
@@ -140,6 +171,7 @@ def connect(mac):
 
     if is_connected(mac):
         logger.info("Connected to %s", mac)
+        _set_pulseaudio_sink(mac)
         return True
 
     err = (result.stdout + result.stderr).strip()
