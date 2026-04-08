@@ -75,9 +75,16 @@ def is_connected(mac):
         return False
 
 
+def _ensure_bt_ready():
+    """Unblock and power on the Bluetooth adapter."""
+    subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"], capture_output=True)
+    time.sleep(0.5)
+    _run(["bluetoothctl", "power", "on"])
+
+
 def connect(mac):
     logger.info("Attempting connection to %s", mac)
-    _run(["bluetoothctl", "power", "on"])
+    _ensure_bt_ready()
     _run(["bluetoothctl", "connect", mac])
     time.sleep(SETTLE_TIME)
 
@@ -89,6 +96,9 @@ def ensure_trusted(mac):
 
 def main():
     speakers = load_speakers()
+
+    # Ensure BT adapter is ready before doing anything
+    _ensure_bt_ready()
 
     if speakers:
         logger.info("Configured speakers (by priority):")

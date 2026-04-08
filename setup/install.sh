@@ -40,6 +40,26 @@ sudo raspi-config nonint do_i2c 0
 echo "I2C enabled (reboot may be required for first use)"
 
 # ------------------------------------------------------------------
+# 2b. Unblock Bluetooth (rfkill) and ensure it stays unblocked
+# ------------------------------------------------------------------
+echo -e "\n>>> Unblocking Bluetooth …"
+sudo rfkill unblock bluetooth
+# Prevent bluetooth from being soft-blocked on future boots
+if ! grep -q "rfkill unblock bluetooth" /etc/rc.local 2>/dev/null; then
+    if [ -f /etc/rc.local ]; then
+        sudo sed -i '/^exit 0/i rfkill unblock bluetooth' /etc/rc.local
+    else
+        sudo tee /etc/rc.local > /dev/null <<'RCEOF'
+#!/bin/sh -e
+rfkill unblock bluetooth
+exit 0
+RCEOF
+        sudo chmod +x /etc/rc.local
+    fi
+fi
+echo "Bluetooth unblocked (persisted in /etc/rc.local)"
+
+# ------------------------------------------------------------------
 # 3. Create log file
 # ------------------------------------------------------------------
 echo -e "\n>>> Creating log file …"

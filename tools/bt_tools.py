@@ -54,7 +54,11 @@ def cmd_scan(args):
     """Scan for nearby Bluetooth devices."""
     duration = args.duration
 
+    # Ensure Bluetooth is unblocked and powered on
+    subprocess.run(["sudo", "rfkill", "unblock", "bluetooth"], capture_output=True)
+    time.sleep(0.5)
     _run(["bluetoothctl", "power", "on"])
+    time.sleep(1)
 
     print(f"🔍  Scanning for Bluetooth devices ({duration}s) …\n")
 
