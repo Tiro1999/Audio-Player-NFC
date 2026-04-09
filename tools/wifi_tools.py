@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # --- Auto-activate project venv if available ---
 import os, sys
-_venv_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "venv", "bin", "python3")
-if os.path.exists(_venv_py) and os.path.abspath(sys.executable) != os.path.abspath(_venv_py):
+_venv_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "venv")
+_venv_py = os.path.join(_venv_dir, "bin", "python3")
+if os.path.isfile(_venv_py) and sys.prefix == sys.base_prefix:
     os.execv(_venv_py, [_venv_py] + sys.argv)
 # -----------------------------------------------
-"""WiFi management tools – add networks with hashed passwords.
+"""WiFi management tools - add networks with hashed passwords.
 
 Passwords are converted to a WPA2 PSK hash (PBKDF2-SHA1, same as
 wpa_passphrase).  The plaintext password is NEVER stored.
@@ -52,7 +53,7 @@ def _load_config():
 
 
 def _save_config(data, path):
-    """Save config.json – uses sudo if direct write fails (boot partition)."""
+    """Save config.json - uses sudo if direct write fails (boot partition)."""
     try:
         with open(path, "w") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -69,7 +70,7 @@ def _save_config(data, path):
 # ── ADD ────────────────────────────────────────────────────────────────────
 
 def cmd_add(args):
-    """Hash the password and store the network in config.json."""
+    """Hash the password, store in config.json, and apply to NetworkManager."""
     ssid = args.ssid
     password = args.password
     priority = args.priority
@@ -95,6 +96,59 @@ def cmd_add(args):
 
     print(f"    Priority : {priority}")
     print(f"    PSK hash : {psk_hash[:16]}…  (password NOT stored)")
+
+    # Apply to NetworkManager immediately
+    _apply_single_network(ssid, psk_hash, priority)
+
+
+# ── APPLY (shared helper) ──────────────────────────────────────────────────
+
+def _apply_single_network(ssid, psk, priority):
+    """Configure a single WiFi network in NetworkManager and try to connect."""
+    print(f"📡  Configuring '{ssid}' in NetworkManager (priority {priority}) …")
+
+    check = subprocess.run(
+        ["nmcli", "connection", "show", ssid], capture_output=True
+    )
+    if check.returncode == 0:
+        # Connection exists – update PSK, autoconnect, priority
+        cmd = [
+            "sudo", "nmcli", "connection", "modify", ssid,
+            "connection.autoconnect", "yes",
+            "connection.autoconnect-priority", str(priority),
+        ]
+        if psk:
+            cmd += ["wifi-sec.psk", psk]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"    ❌ nmcli modify failed: {result.stderr.strip()}")
+            return
+        print(f"    ✔ Updated in NetworkManager")
+    else:
+        # New connection
+        cmd = [
+            "sudo", "nmcli", "connection", "add",
+            "type", "wifi", "con-name", ssid, "ssid", ssid,
+            "connection.autoconnect", "yes",
+            "connection.autoconnect-priority", str(priority),
+        ]
+        if psk:
+            cmd += ["wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", psk]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            print(f"    ❌ nmcli add failed: {result.stderr.strip()}")
+            return
+        print(f"    ✔ Added to NetworkManager")
+
+    # Try to connect now (may fail if network not in range)
+    result = subprocess.run(
+        ["sudo", "nmcli", "connection", "up", ssid],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print(f"    ✅ Connected to '{ssid}'!")
+    else:
+        print(f"    ℹ️  Saved (will auto-connect when '{ssid}' is in range)")
 
 
 # ── LIST ───────────────────────────────────────────────────────────────────
@@ -133,7 +187,17 @@ def cmd_remove(args):
         print(f"❌  '{args.ssid}' not found in config.")
         return
     _save_config(config, config_path)
-    print(f"🗑️   Removed '{args.ssid}'")
+    print(f"🗑️   Removed '{args.ssid}' from config.json")
+
+    # Also remove from NetworkManager
+    result = subprocess.run(
+        ["sudo", "nmcli", "connection", "delete", args.ssid],
+        capture_output=True, text=True,
+    )
+    if result.returncode == 0:
+        print(f"    ✔ Removed from NetworkManager")
+    else:
+        print(f"    ℹ️  Not found in NetworkManager (may not have been applied)")
 
 
 # ── APPLY ──────────────────────────────────────────────────────────────────
@@ -148,32 +212,9 @@ def cmd_apply(args):
 
     for w in networks:
         ssid = w["ssid"]
-        # psk_hash (64 hex chars) is accepted by nmcli as a raw PSK
         psk = w.get("psk_hash") or w.get("psk", "")
         priority = w.get("priority", 0)
-
-        print(f"📡  Configuring '{ssid}' (priority {priority}) …")
-
-        check = subprocess.run(
-            ["nmcli", "connection", "show", ssid], capture_output=True
-        )
-        if check.returncode == 0:
-            subprocess.run([
-                "sudo", "nmcli", "connection", "modify", ssid,
-                "wifi-sec.psk", psk,
-                "connection.autoconnect-priority", str(priority),
-            ], capture_output=True)
-            print(f"    ✔ Updated")
-        else:
-            subprocess.run([
-                "sudo", "nmcli", "connection", "add",
-                "type", "wifi", "con-name", ssid, "ssid", ssid,
-                "wifi-sec.key-mgmt", "wpa-psk",
-                "wifi-sec.psk", psk,
-                "connection.autoconnect", "yes",
-                "connection.autoconnect-priority", str(priority),
-            ], capture_output=True)
-            print(f"    ✔ Added")
+        _apply_single_network(ssid, psk, priority)
 
     print(f"\n✅  {len(networks)} network(s) configured in NetworkManager")
 
@@ -244,4 +285,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as exc:
+        print(f"❌  Error: {exc}", file=sys.stderr)
+        sys.exit(1)

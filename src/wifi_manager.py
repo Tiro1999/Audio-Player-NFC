@@ -109,10 +109,17 @@ def handle_wifi_tag(wifi_data):
         )
 
         if check.returncode == 0:
-            cmd = ["sudo", "nmcli", "connection", "modify", ssid]
+            cmd = [
+                "sudo", "nmcli", "connection", "modify", ssid,
+                "connection.autoconnect", "yes",
+                "connection.autoconnect-priority", "5",
+            ]
             if nm_psk:
                 cmd += ["wifi-sec.psk", nm_psk]
-            subprocess.run(cmd, capture_output=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error("nmcli modify failed: %s", result.stderr.strip())
+                return False
             logger.info("Updated NM connection '%s'", ssid)
         else:
             cmd = [
@@ -123,7 +130,10 @@ def handle_wifi_tag(wifi_data):
             ]
             if nm_psk:
                 cmd += ["wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", nm_psk]
-            subprocess.run(cmd, capture_output=True, check=True)
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error("nmcli add failed: %s", result.stderr.strip())
+                return False
             logger.info("Created NM connection '%s'", ssid)
 
         # Try to activate (may fail if network is out of range)

@@ -203,6 +203,7 @@ alias nfc-restart='sudo systemctl restart nfc-player bt-autoconnect && echo "✅
 alias nfc-status='systemctl status nfc-player bt-autoconnect raspotify --no-pager -l'
 alias nfc-test='python3 ~/nfc-player/tools/nfc_test.py'
 alias nfc-bt='python3 ~/nfc-player/tools/bt_tools.py'
+alias nfc-wifi='python3 ~/nfc-player/tools/wifi_tools.py'
 
 # Login banner (only for interactive shells)
 if [ -t 0 ] && [ -z "${_NFC_BANNER_SHOWN:-}" ]; then
@@ -217,7 +218,7 @@ if [ -t 0 ] && [ -z "${_NFC_BANNER_SHOWN:-}" ]; then
     echo "  📋  Letzte Log-Einträge:"
     tail -5 ~/nfc-player/logs/nfc_player.log 2>/dev/null | sed 's/^/    /' || echo "    (noch kein Log)"
     echo ""
-    echo "  Befehle: nfc-log · nfc-status · nfc-restart · nfc-test · nfc-bt"
+    echo "  Befehle: nfc-log · nfc-status · nfc-restart · nfc-test · nfc-bt · nfc-wifi"
     echo "──────────────────────────────────"
     echo ""
 fi
@@ -288,6 +289,7 @@ echo "  nfc-status   – Service-Status anzeigen"
 echo "  nfc-restart  – Services neu starten"
 echo "  nfc-test     – Spotify URI Test (ohne NFC Tag)"
 echo "  nfc-bt       – Bluetooth Tools"
+echo "  nfc-wifi     – WiFi Tools (add/list/remove/apply/scan)"
 echo ""
 
 # Try to activate aliases in current shell (won't work in subshell, but
