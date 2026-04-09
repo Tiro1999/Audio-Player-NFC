@@ -125,12 +125,12 @@ def main():
                 logger.info("Same tag – playback continues")
 
             nfc.wait_for_removal()
-            logger.info("Tag removed")
+            logger.info("Tag removed – reader reset, waiting for next tag …")
+            last_uri = None  # allow re-scan of same tag
             time.sleep(REMOVAL_COOLDOWN)
 
             if config.pause_on_remove:
                 spotify.pause()
-                last_uri = None
 
         except OSError as exc:
             logger.error("I2C bus error: %s – reinitializing NFC …", exc)

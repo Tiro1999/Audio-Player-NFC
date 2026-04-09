@@ -361,12 +361,30 @@ class NFCReader:
         logger.debug("No mapping for tag %s", uid_hex)
         return None
 
+    def reset(self):
+        """Reset the PN532 state machine so it can detect new tags.
+
+        After reading NTAG memory blocks (ntag2xx_read_block), the PN532
+        keeps the old target in its internal list.  Subsequent calls to
+        read_passive_target may silently return None for every new tag.
+        Calling SAM_configuration() clears the target list and puts the
+        chip back into idle/scan mode.
+        """
+        try:
+            self.pn532.SAM_configuration()
+            logger.debug("PN532 reset (SAM_configuration)")
+        except OSError as exc:
+            logger.debug("PN532 reset failed: %s", exc)
+
     def wait_for_removal(self, poll_interval=0.3, timeout=0.5, consecutive_misses=3):
         """Block until the tag is removed from the reader.
 
         Requires multiple consecutive failed reads to avoid false positives
         caused by I2C bus glitches or brief contact loss.
         I2C errors count as a "miss" (tag likely moved away).
+
+        After removal is confirmed the PN532 is reset via SAM_configuration
+        so the next read_passive_target call can find a fresh tag.
         """
         misses = 0
         while misses < consecutive_misses:
@@ -379,3 +397,6 @@ class NFCReader:
             else:
                 misses = 0
             time.sleep(poll_interval)
+
+        # Reset PN532 so it can detect the next tag
+        self.reset()
