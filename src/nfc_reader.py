@@ -24,8 +24,6 @@ SPOTIFY_URL_RE = re.compile(
 def _init_pn532():
     """Initialize the PN532 over I2C (lazy, so import errors don't crash tests)."""
     global _pn532
-    if _pn532 is not None:
-        return _pn532
 
     import board
     import busio
@@ -278,7 +276,10 @@ class NFCReader:
         self.pn532 = _init_pn532()
 
     def wait_for_tag(self, timeout=0.5):
-        """Block until a tag is present. Returns UID hex string or None on timeout."""
+        """Block until a tag is present. Returns UID hex string or None on timeout.
+
+        Raises OSError on persistent I2C failures so the caller can re-init.
+        """
         uid = self.pn532.read_passive_target(timeout=timeout)
         if uid is None:
             return None
@@ -365,10 +366,14 @@ class NFCReader:
 
         Requires multiple consecutive failed reads to avoid false positives
         caused by I2C bus glitches or brief contact loss.
+        I2C errors count as a "miss" (tag likely moved away).
         """
         misses = 0
         while misses < consecutive_misses:
-            uid = self.pn532.read_passive_target(timeout=timeout)
+            try:
+                uid = self.pn532.read_passive_target(timeout=timeout)
+            except OSError:
+                uid = None  # treat I2C error as "tag gone"
             if uid is None:
                 misses += 1
             else:
