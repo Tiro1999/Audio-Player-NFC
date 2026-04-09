@@ -26,6 +26,8 @@ class TestIsValidSpotifyUri:
         "spotify:artist:0OdUWJ0sBjDrqHygGUXeCF",
         "spotify:episode:512ojhOuo1ktJprKbVcKyQ",
         "spotify:show:2MAi0BvDc6GTFvKFPXnkCL",
+        "spotify:audiobook:7iHfbu1YPACw6oZPAFJtqe",
+        "spotify:chapter:0D5wENdkdwbqlrHoaJ9g29",
     ])
     def test_valid_native_uris(self, uri):
         assert is_valid_spotify_uri(uri) is True
@@ -35,6 +37,8 @@ class TestIsValidSpotifyUri:
         "https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M",
         "http://open.spotify.com/album/6dVIqQ8qmQ5GBnJ9shOYGE",
         "https://open.spotify.com/artist/0OdUWJ0sBjDrqHygGUXeCF",
+        "https://open.spotify.com/audiobook/7iHfbu1YPACw6oZPAFJtqe",
+        "https://open.spotify.com/chapter/0D5wENdkdwbqlrHoaJ9g29",
     ])
     def test_valid_web_urls(self, url):
         assert is_valid_spotify_uri(url) is True
@@ -71,6 +75,11 @@ class TestSpotifyUrlToUri:
 
     def test_native_uri_passthrough(self):
         assert spotify_url_to_uri("spotify:album:abc123") == "spotify:album:abc123"
+
+    def test_audiobook_url(self):
+        assert spotify_url_to_uri(
+            "https://open.spotify.com/audiobook/7iHfbu1YPACw6oZPAFJtqe"
+        ) == "spotify:audiobook:7iHfbu1YPACw6oZPAFJtqe"
 
     def test_unknown_url_returns_none(self):
         assert spotify_url_to_uri("https://example.com/foo") is None

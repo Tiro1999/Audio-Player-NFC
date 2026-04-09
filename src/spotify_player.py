@@ -103,11 +103,22 @@ class SpotifyPlayer:
             return False
 
         try:
-            if ":track:" in spotify_uri:
+            uri_type = spotify_uri.split(":")[1] if spotify_uri.count(":") >= 2 else ""
+
+            if uri_type in ("track", "episode", "chapter"):
+                # Single items → play via uris array
                 self._sp.start_playback(device_id=device_id, uris=[spotify_uri])
+            elif uri_type in ("album", "playlist", "audiobook"):
+                # Contexts with offset → always start from the first track/chapter
+                self._sp.start_playback(
+                    device_id=device_id,
+                    context_uri=spotify_uri,
+                    offset={"position": 0},
+                )
             else:
-                # album, playlist, artist, show, episode
+                # artist, show — context without offset
                 self._sp.start_playback(device_id=device_id, context_uri=spotify_uri)
+
             logger.info("▶  Playing %s on %s", spotify_uri, self.device_name)
             return True
         except spotipy.exceptions.SpotifyException as exc:

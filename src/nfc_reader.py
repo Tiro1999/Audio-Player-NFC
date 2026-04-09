@@ -17,7 +17,7 @@ logger = Logger(__name__)
 _pn532 = None
 
 SPOTIFY_URL_RE = re.compile(
-    r"https?://open\.spotify\.com/(track|album|playlist|artist|episode|show)/([a-zA-Z0-9]+)"
+    r"https?://open\.spotify\.com/(track|album|playlist|artist|episode|show|audiobook|chapter)/([a-zA-Z0-9]+)"
 )
 
 
@@ -61,7 +61,7 @@ def is_valid_spotify_uri(uri):
         return False
     # Native Spotify URI
     if re.match(
-        r"^spotify:(track|album|playlist|artist|episode|show):[a-zA-Z0-9]+$", uri
+        r"^spotify:(track|album|playlist|artist|episode|show|audiobook|chapter):[a-zA-Z0-9]+$", uri
     ):
         return True
     # Spotify web URL – strict hostname check
@@ -71,7 +71,7 @@ def is_valid_spotify_uri(uri):
             parsed.scheme in ("http", "https")
             and parsed.hostname == "open.spotify.com"
             and bool(re.match(
-                r"^/(track|album|playlist|artist|episode|show)/[a-zA-Z0-9]+",
+                r"^/(track|album|playlist|artist|episode|show|audiobook|chapter)/[a-zA-Z0-9]+",
                 parsed.path,
             ))
         )
