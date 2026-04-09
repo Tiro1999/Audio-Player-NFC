@@ -1,6 +1,7 @@
 """NFC Spotify Player – main entry point.
 
 Continuously reads NFC tags and triggers Spotify playback.
+Supports WiFi configuration via NFC tags.
 Run with:  python3 -m src.main
 """
 
@@ -49,6 +50,15 @@ def _init_spotify(config):
         return None
 
 
+def _handle_wifi_tag(tag_data):
+    """Process a WiFi NFC tag – add network and connect."""
+    try:
+        from .wifi_manager import handle_wifi_tag
+        handle_wifi_tag(tag_data)
+    except Exception as exc:
+        logger.error("WiFi tag handling failed: %s", exc)
+
+
 def main():
     signal.signal(signal.SIGINT, _handle_signal)
     signal.signal(signal.SIGTERM, _handle_signal)
@@ -90,14 +100,24 @@ def main():
 
             logger.info("Tag detected: %s", uid)
 
-            uri = nfc.read_spotify_uri(uid, config.nfc_tags)
-            if uri is None:
+            tag_data = nfc.read_tag(uid, config.nfc_tags)
+            if tag_data is None:
                 logger.warn("Unknown tag %s – ignoring", uid)
                 nfc.wait_for_removal()
                 last_uri = None
                 time.sleep(REMOVAL_COOLDOWN)
                 continue
 
+            # ── WiFi tag ──
+            if tag_data["type"] == "wifi":
+                _handle_wifi_tag(tag_data)
+                nfc.wait_for_removal()
+                logger.info("WiFi tag removed")
+                time.sleep(REMOVAL_COOLDOWN)
+                continue
+
+            # ── Spotify tag ──
+            uri = tag_data["uri"]
             if uri != last_uri:
                 spotify.play(uri)
                 last_uri = uri
@@ -112,6 +132,14 @@ def main():
                 spotify.pause()
                 last_uri = None
 
+        except OSError as exc:
+            logger.error("I2C bus error: %s – reinitializing NFC …", exc)
+            nfc = _init_nfc()
+            if nfc is None:
+                while nfc is None and not _shutdown:
+                    time.sleep(NFC_RETRY_INTERVAL)
+                    nfc = _init_nfc()
+            time.sleep(1)
         except KeyboardInterrupt:
             break
         except Exception as exc:
