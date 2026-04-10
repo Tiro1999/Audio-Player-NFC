@@ -100,16 +100,17 @@ def _read_tag_user_memory(pn532, max_pages=40, retries=3):
                 data.extend(block)
             except Exception:
                 break
+        logger.debug("Tag memory read: %d bytes (attempt %d/%d)", len(data), attempt + 1, retries)
         if len(data) > len(best_data):
             best_data = bytes(data)
         # If we got a reasonable amount, accept it
         if len(data) >= 64:
             break
         if attempt < retries - 1:
-            logger.debug("Short read (%d bytes), retrying…", len(data))
+            logger.debug("Short read (%d bytes), retrying …", len(data))
             time.sleep(0.15)
 
-    logger.trace("Read %d bytes of tag user memory", len(best_data))
+    logger.debug("Tag memory result: %d bytes (best of %d attempt(s))", len(best_data), retries)
     return best_data
 
 
@@ -223,14 +224,17 @@ def _extract_tag_data(raw):
 
         raw = _strip_ndef_tlv(raw)
         records = list(ndeflib.message_decoder(raw))
+        logger.debug("NDEF: decoded %d record(s) from %d bytes", len(records), len(raw))
 
         # First pass: WiFi records (WSC MIME or text/URI with WIFI: prefix)
-        for record in records:
+        for i, record in enumerate(records):
+            rtype = type(record).__name__
             if hasattr(record, "credential") and record.credential:
                 cred = record.credential[0]
                 ssid = getattr(cred, "network_name", "") or ""
                 key = getattr(cred, "network_key", "") or ""
                 if ssid:
+                    logger.debug("NDEF record #%d (%s): WiFi credential SSID='%s'", i + 1, rtype, ssid)
                     return {
                         "type": "wifi",
                         "ssid": ssid,
@@ -247,10 +251,12 @@ def _extract_tag_data(raw):
             if text and text.strip().upper().startswith("WIFI:"):
                 result = _parse_wifi_string(text)
                 if result:
+                    logger.debug("NDEF record #%d (%s): WiFi string SSID='%s'", i + 1, rtype, result["ssid"])
                     return result
 
         # Second pass: Spotify records
-        for record in records:
+        for i, record in enumerate(records):
+            rtype = type(record).__name__
             uri = None
             if hasattr(record, "uri"):
                 uri = record.uri
@@ -259,10 +265,15 @@ def _extract_tag_data(raw):
             if uri:
                 converted = spotify_url_to_uri(uri)
                 if converted:
+                    logger.debug("NDEF record #%d (%s): Spotify → %s", i + 1, rtype, converted)
                     return {"type": "spotify", "uri": converted}
+                else:
+                    logger.trace("NDEF record #%d (%s): non-Spotify URI '%s'", i + 1, rtype, uri[:80])
+
+        logger.debug("NDEF: no actionable records found in %d record(s)", len(records))
 
     except Exception as exc:
-        logger.debug("NDEF parse failed (%s)", exc)
+        logger.debug("NDEF parse failed: %s", exc)
 
     return None
 
@@ -333,18 +344,20 @@ class NFCReader:
         try:
             raw = _read_tag_user_memory(self.pn532)
             if raw:
-                logger.trace("Raw NDEF (%d bytes): %s…", len(raw), raw[:64].hex())
+                logger.trace("Raw tag memory: %d bytes: %s…", len(raw), raw[:64].hex())
                 data = _extract_tag_data(raw)
                 if data:
                     if data["type"] == "wifi":
-                        logger.info("📶 WiFi tag: SSID=%s", data["ssid"])
+                        logger.info("Tag resolved → WiFi (SSID='%s')", data["ssid"])
                         return data
                     if data["type"] == "spotify":
                         if not is_valid_spotify_uri(data["uri"]):
-                            logger.warn("NDEF URI rejected (not Spotify): %s", data["uri"])
+                            logger.warn("Rejected: URI is not a valid Spotify link: %s", data["uri"])
                             return None
-                        logger.info("🎵 NDEF URI: %s", data["uri"])
+                        logger.info("Tag resolved → Spotify (uri=%s)", data["uri"])
                         return data
+                else:
+                    logger.debug("NDEF data present but no actionable content")
         except Exception as exc:
             logger.debug("NDEF read failed: %s", exc)
 
@@ -353,12 +366,12 @@ class NFCReader:
         if uri:
             resolved = spotify_url_to_uri(uri) or uri
             if not is_valid_spotify_uri(resolved):
-                logger.warn("Config URI rejected (not Spotify): %s", resolved)
+                logger.warn("Rejected: Config URI is not Spotify: %s", resolved)
                 return None
-            logger.info("UID %s → %s (config)", uid_hex, resolved)
+            logger.info("Tag resolved → Spotify via UID lookup (uid=%s, uri=%s)", uid_hex, resolved)
             return {"type": "spotify", "uri": resolved}
 
-        logger.debug("No mapping for tag %s", uid_hex)
+        logger.debug("No mapping for tag UID=%s", uid_hex)
         return None
 
     def reset(self):
@@ -394,9 +407,13 @@ class NFCReader:
                 uid = None  # treat I2C error as "tag gone"
             if uid is None:
                 misses += 1
+                logger.debug("Removal check: miss %d/%d", misses, consecutive_misses)
             else:
+                if misses > 0:
+                    logger.debug("Removal check: tag still present (resetting miss counter)")
                 misses = 0
             time.sleep(poll_interval)
 
+        logger.debug("Tag removal confirmed (%d consecutive misses)", consecutive_misses)
         # Reset PN532 so it can detect the next tag
         self.reset()
