@@ -65,6 +65,10 @@ def main():
 
     config = Config()
 
+    logger.info("══════════════════════════════════════════")
+    logger.info("  NFC Spotify Player – Starting")
+    logger.info("══════════════════════════════════════════")
+
     # --- Wait for NFC reader hardware ---
     logger.info("Initializing NFC reader …")
     nfc = _init_nfc()
@@ -87,7 +91,9 @@ def main():
     if _shutdown:
         return
 
-    logger.info("NFC Player ready – waiting for tags …")
+    logger.info("══════════════════════════════════════════")
+    logger.info("  ✅ Ready – waiting for NFC tags")
+    logger.info("══════════════════════════════════════════")
 
     last_uri = None
 
@@ -98,45 +104,70 @@ def main():
                 time.sleep(0.1)
                 continue
 
-            logger.info("Tag detected: %s", uid)
+            # ── Tag lifecycle ─────────────────────────────────────
+            logger.info("──── Tag detected ──────────────────────")
+            logger.info("  UID    : %s", uid)
 
             tag_data = nfc.read_tag(uid, config.nfc_tags)
             if tag_data is None:
-                logger.warn("Unknown tag %s – ignoring", uid)
+                logger.warn("  Result : No actionable data (unknown tag)")
+                logger.info("  Waiting for tag removal …")
                 nfc.wait_for_removal()
                 last_uri = None
+                logger.info("  Tag removed")
                 time.sleep(REMOVAL_COOLDOWN)
+                logger.info("────────────────────────────────────────")
                 continue
 
             # ── WiFi tag ──
             if tag_data["type"] == "wifi":
+                logger.info("  Type   : WiFi")
+                logger.info("  SSID   : %s", tag_data.get("ssid", "?"))
+                logger.info("  Security: %s", tag_data.get("security", "?"))
+                logger.info("  Action : Configuring network …")
                 _handle_wifi_tag(tag_data)
+                logger.info("  Waiting for tag removal …")
                 nfc.wait_for_removal()
-                logger.info("WiFi tag removed")
+                logger.info("  Tag removed")
                 time.sleep(REMOVAL_COOLDOWN)
+                logger.info("────────────────────────────────────────")
                 continue
 
             # ── Spotify tag ──
             uri = tag_data["uri"]
+            logger.info("  Type   : Spotify")
+            logger.info("  URI    : %s", uri)
+
             if uri != last_uri:
-                spotify.play(uri)
+                logger.info("  Action : New URI → starting playback")
+                result = spotify.play(uri)
+                if result:
+                    logger.info("  Result : ✅ Playback started")
+                else:
+                    logger.error("  Result : ❌ Playback failed")
                 last_uri = uri
             else:
-                logger.info("Same tag – playback continues")
+                logger.info("  Action : Same tag re-scanned → playback continues")
 
+            logger.info("  Waiting for tag removal …")
             nfc.wait_for_removal()
-            logger.info("Tag removed – reader reset, waiting for next tag …")
+            logger.info("  Tag removed")
             last_uri = None  # allow re-scan of same tag
             time.sleep(REMOVAL_COOLDOWN)
 
             if config.pause_on_remove:
+                logger.info("  Pausing playback (pause_on_remove=true)")
                 spotify.pause()
 
+            logger.info("────────────────────────────────────────")
+
         except OSError as exc:
-            logger.error("I2C bus error: %s – reinitializing NFC …", exc)
+            logger.error("I2C bus error: %s", exc)
+            logger.info("Reinitializing NFC reader …")
             nfc = _init_nfc()
             if nfc is None:
                 while nfc is None and not _shutdown:
+                    logger.info("NFC hardware unavailable – retry in %ds", NFC_RETRY_INTERVAL)
                     time.sleep(NFC_RETRY_INTERVAL)
                     nfc = _init_nfc()
             time.sleep(1)

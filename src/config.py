@@ -1,10 +1,11 @@
 """Configuration reader for /boot/firmware/config.json (FAT32 boot partition)."""
 
 import json
-import logging
 import os
 
-logger = logging.getLogger(__name__)
+from .logger import Logger
+
+logger = Logger(__name__)
 
 CONFIG_SEARCH_PATHS = [
     "/boot/firmware/config.json",  # Pi OS Bookworm
