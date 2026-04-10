@@ -66,16 +66,20 @@ def handle_wifi_tag(wifi_data):
         logger.warn("WiFi tag has no SSID – ignoring")
         return False
 
-    logger.info("📶 Processing WiFi tag: SSID='%s' Security=%s", ssid, security)
+    logger.info("Processing WiFi tag: SSID='%s', Security=%s", ssid, security)
 
-    # Hash password (unless open network)
+    # Step 1: Hash password
     psk = ""
     if password and security not in ("", "NOPASS", "OPEN"):
         psk = wpa_psk(ssid, password)
+        logger.debug("Step 1/4: PSK hash derived (%s…)", psk[:16])
+    else:
+        logger.debug("Step 1/4: Open network, no PSK needed")
 
-    # ── Update config.json ────────────────────────────────────────────
+    # Step 2: Update config.json
     try:
         config_data, config_path = _load_config()
+        logger.debug("Step 2/4: Loaded config from %s", config_path)
 
         if "wifi" not in config_data:
             config_data["wifi"] = []
@@ -86,21 +90,21 @@ def handle_wifi_tag(wifi_data):
                 existing["psk_hash"] = psk
                 existing.pop("psk", None)
             existing["priority"] = existing.get("priority", 5)
-            logger.info("Updated WiFi '%s' in config", ssid)
+            logger.info("Step 2/4: Updated existing WiFi '%s' in config", ssid)
         else:
             entry = {"ssid": ssid, "priority": 5}
             if psk:
                 entry["psk_hash"] = psk
             config_data["wifi"].append(entry)
-            logger.info("Added WiFi '%s' to config", ssid)
+            logger.info("Step 2/4: Added new WiFi '%s' to config", ssid)
 
         config_data["wifi"].sort(key=lambda w: w.get("priority", 0), reverse=True)
         _save_config(config_data, config_path)
     except Exception as exc:
-        logger.error("Failed to update config.json: %s", exc)
+        logger.error("Step 2/4: Failed to update config.json: %s", exc)
         return False
 
-    # ── Apply to NetworkManager ───────────────────────────────────────
+    # Step 3: Push to NetworkManager
     try:
         nm_psk = psk or password
         check = subprocess.run(
@@ -118,9 +122,9 @@ def handle_wifi_tag(wifi_data):
                 cmd += ["wifi-sec.psk", nm_psk]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error("nmcli modify failed: %s", result.stderr.strip())
+                logger.error("Step 3/4: nmcli modify failed: %s", result.stderr.strip())
                 return False
-            logger.info("Updated NM connection '%s'", ssid)
+            logger.info("Step 3/4: Updated NM connection '%s'", ssid)
         else:
             cmd = [
                 "sudo", "nmcli", "connection", "add",
@@ -132,23 +136,23 @@ def handle_wifi_tag(wifi_data):
                 cmd += ["wifi-sec.key-mgmt", "wpa-psk", "wifi-sec.psk", nm_psk]
             result = subprocess.run(cmd, capture_output=True, text=True)
             if result.returncode != 0:
-                logger.error("nmcli add failed: %s", result.stderr.strip())
+                logger.error("Step 3/4: nmcli add failed: %s", result.stderr.strip())
                 return False
-            logger.info("Created NM connection '%s'", ssid)
+            logger.info("Step 3/4: Created NM connection '%s'", ssid)
 
-        # Try to activate (may fail if network is out of range)
+        # Step 4: Try to connect
         result = subprocess.run(
             ["sudo", "nmcli", "connection", "up", ssid],
             capture_output=True, text=True,
         )
         if result.returncode == 0:
-            logger.info("✅ WiFi '%s' connected!", ssid)
+            logger.info("Step 4/4: ✅ WiFi '%s' connected!", ssid)
         else:
             logger.warn(
-                "WiFi '%s' saved but not in range (will auto-connect later)", ssid
+                "Step 4/4: WiFi '%s' saved but not in range (will auto-connect later)", ssid
             )
 
         return True
     except Exception as exc:
-        logger.error("Failed to apply WiFi to NetworkManager: %s", exc)
+        logger.error("Step 3/4: Failed to apply WiFi to NetworkManager: %s", exc)
         return False
