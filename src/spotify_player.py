@@ -59,16 +59,25 @@ class SpotifyPlayer:
         try:
             devices = self._sp.devices().get("devices", [])
         except Exception as exc:
-            logger.error("Failed to list Spotify devices: %s", exc)
+            logger.error("Failed to query Spotify devices: %s", exc)
             return None
+
+        if not devices:
+            logger.debug("No Spotify devices available")
+            return None
+
+        names = [f"{d['name']} ({'active' if d['is_active'] else 'idle'})" for d in devices]
+        logger.debug("Spotify devices: %s", " | ".join(names))
 
         for dev in devices:
             if dev["name"] == self.device_name:
+                logger.info("Target device found: %s (id=%s…)", dev["name"], dev["id"][:12])
                 return dev["id"]
 
-        names = [d["name"] for d in devices]
         logger.warning(
-            "Device '%s' not found. Available: %s", self.device_name, names
+            "Device '%s' not found. Available: %s",
+            self.device_name,
+            [d["name"] for d in devices],
         )
         return None
 
@@ -84,6 +93,8 @@ class SpotifyPlayer:
         Retries a few times if the device isn't found immediately (Raspotify
         may still be starting up).
         """
+        logger.info("Playback request: %s", spotify_uri)
+
         if not is_valid_spotify_uri(spotify_uri):
             logger.error("URI rejected (not a valid Spotify link): %s", spotify_uri)
             return False
@@ -94,7 +105,7 @@ class SpotifyPlayer:
                 break
             if attempt < retries:
                 logger.info(
-                    "Device not ready, retry %d/%d in %ds…",
+                    "Device not ready, retry %d/%d in %ds …",
                     attempt, retries, retry_delay,
                 )
                 time.sleep(retry_delay)
@@ -106,17 +117,17 @@ class SpotifyPlayer:
             uri_type = spotify_uri.split(":")[1] if spotify_uri.count(":") >= 2 else ""
 
             if uri_type in ("track", "episode", "chapter"):
-                # Single items → play via uris array
+                logger.debug("URI type '%s' → single item playback (uris=[])", uri_type)
                 self._sp.start_playback(device_id=device_id, uris=[spotify_uri])
             elif uri_type in ("album", "playlist", "audiobook"):
-                # Contexts with offset → always start from the first track/chapter
+                logger.debug("URI type '%s' → context playback (offset position=0)", uri_type)
                 self._sp.start_playback(
                     device_id=device_id,
                     context_uri=spotify_uri,
                     offset={"position": 0},
                 )
             else:
-                # artist, show — context without offset
+                logger.debug("URI type '%s' → context playback (no offset)", uri_type)
                 self._sp.start_playback(device_id=device_id, context_uri=spotify_uri)
 
             logger.info("▶  Playing %s on %s", spotify_uri, self.device_name)
