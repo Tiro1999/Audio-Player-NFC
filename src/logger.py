@@ -1,19 +1,10 @@
-"""Centralized logging with colored console output and rotating log file.
+"""Centralized structured logging with colored console and rotating file.
 
-Usage::
+Log format:  TIMESTAMP | LEVEL | FILE | FUNCTION | MESSAGE
 
-    from .logger import Logger
-
-    logger = Logger(__name__)
-    logger.trace("very verbose detail")
-    logger.debug("debug information")
-    logger.info("normal information")
-    logger.warn("something looks off")
-    logger.error("something broke")
-
-Log output goes to:
-  • stdout  – colored, human-friendly
-  • ~/nfc-player/logs/nfc_player.log – plain text, rotated at 5 MB (3 backups)
+Output targets:
+  - stdout  -- colored, human-friendly (short timestamp)
+  - ~/nfc-player/logs/nfc_player.log -- plain text, rotated at 5 MB (3 backups)
 """
 
 import logging
@@ -25,7 +16,7 @@ from logging.handlers import RotatingFileHandler
 TRACE = 5
 logging.addLevelName(TRACE, "TRACE")
 
-# ── Configuration ─────────────────────────────────────────────────────────
+# ── Paths ─────────────────────────────────────────────────────────────────
 _SRC_DIR = pathlib.Path(__file__).resolve().parent
 _PROJECT_DIR = _SRC_DIR.parent
 LOG_DIR = str(_PROJECT_DIR / "logs")
@@ -33,9 +24,16 @@ LOG_FILE = str(_PROJECT_DIR / "logs" / "nfc_player.log")
 MAX_LOG_BYTES = 5 * 1024 * 1024   # 5 MB per file
 LOG_BACKUP_COUNT = 3               # keep 3 rotated backups
 
+# ── Structured format: TIMESTAMP | LEVEL | FILE | FUNCTION | MESSAGE ─────
+_FMT_FILE = "%(asctime)s | %(levelname)-7s | %(filename)-18s | %(funcName)-22s | %(message)s"
+_FMT_CONSOLE = "%(asctime)s | %(levelname)-7s | %(filename)-18s | %(funcName)-22s | %(message)s"
+_DATEFMT_FILE = "%Y-%m-%d %H:%M:%S"
+_DATEFMT_CONSOLE = "%H:%M:%S"
+
 # ── ANSI colors ───────────────────────────────────────────────────────────
 _RESET = "\033[0m"
 _BOLD = "\033[1m"
+_DIM = "\033[2m"
 _COLORS = {
     TRACE:           "\033[90m",    # grey
     logging.DEBUG:   "\033[36m",    # cyan
@@ -46,7 +44,7 @@ _COLORS = {
 
 
 class _ColorFormatter(logging.Formatter):
-    """Adds ANSI color codes to log output (console only)."""
+    """Adds ANSI color codes to structured log output (console only)."""
 
     def format(self, record):
         color = _COLORS.get(record.levelno, "")
@@ -57,17 +55,19 @@ class _ColorFormatter(logging.Formatter):
         record.msg = f"{color}{record.msg}{_RESET}"
         out = super().format(record)
 
-        # Restore originals so the file handler gets clean text
+        # Dim the pipe separators for visual clarity
+        out = out.replace(" | ", f" {_DIM}|{_RESET} ")
+
         record.levelname = saved_levelname
         record.msg = saved_msg
         return out
 
 
 class Logger:
-    """Drop-in logger with ``.trace()``, colored console, and file rotation.
+    """Structured logger: TIMESTAMP | LEVEL | FILE | FUNCTION | MESSAGE.
 
-    The logging subsystem is initialised once on first ``Logger`` instantiation.
-    Subsequent instances simply create a named child logger.
+    Uses ``stacklevel=2`` so that ``%(filename)s`` and ``%(funcName)s``
+    resolve to the *caller* of the Logger method, not the Logger wrapper.
     """
 
     _initialized = False
@@ -84,10 +84,7 @@ class Logger:
         # ── Console handler (colored) ─────────────────────────────────
         console = logging.StreamHandler()
         console.setLevel(console_level)
-        console.setFormatter(_ColorFormatter(
-            "%(asctime)s %(levelname)s [%(name)s] %(message)s",
-            datefmt="%H:%M:%S",
-        ))
+        console.setFormatter(_ColorFormatter(_FMT_CONSOLE, datefmt=_DATEFMT_CONSOLE))
         root.addHandler(console)
 
         # ── File handler (rotating, plain text) ───────────────────────
@@ -99,13 +96,14 @@ class Logger:
                 backupCount=LOG_BACKUP_COUNT,
             )
             fh.setLevel(file_level)
-            fh.setFormatter(logging.Formatter(
-                "%(asctime)s %(levelname)-7s [%(name)s] %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            ))
+            fh.setFormatter(logging.Formatter(_FMT_FILE, datefmt=_DATEFMT_FILE))
             root.addHandler(fh)
         except (PermissionError, OSError) as exc:
             root.warning("File logging disabled – cannot write to %s (%s)", LOG_FILE, exc)
+
+        # Reduce noise from third-party libraries
+        for name in ("spotipy", "urllib3", "httpcore", "httpx"):
+            logging.getLogger(name).setLevel(logging.WARNING)
 
         cls._initialized = True
 
@@ -116,16 +114,21 @@ class Logger:
         self._log = logging.getLogger(name)
 
     def trace(self, msg, *args, **kwargs):
+        kwargs.setdefault("stacklevel", 2)
         self._log.log(TRACE, msg, *args, **kwargs)
 
     def debug(self, msg, *args, **kwargs):
+        kwargs.setdefault("stacklevel", 2)
         self._log.debug(msg, *args, **kwargs)
 
     def info(self, msg, *args, **kwargs):
+        kwargs.setdefault("stacklevel", 2)
         self._log.info(msg, *args, **kwargs)
 
     def warn(self, msg, *args, **kwargs):
+        kwargs.setdefault("stacklevel", 2)
         self._log.warning(msg, *args, **kwargs)
 
     def error(self, msg, *args, **kwargs):
+        kwargs.setdefault("stacklevel", 2)
         self._log.error(msg, *args, **kwargs)
