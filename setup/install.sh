@@ -200,7 +200,7 @@ fi
 
 cat >> "$BASHRC" <<'BASHEOF'
 # --- NFC Spotify Player ---
-alias nfc-log='tail -f ~/nfc-player/logs/nfc_player.log'
+alias nfc-log='tail -f ~/nfc-player/logs/nfc_player.log &'
 alias nfc-restart='sudo systemctl restart nfc-player bt-autoconnect && echo "✅ Services restarted"'
 alias nfc-status='systemctl status nfc-player bt-autoconnect raspotify --no-pager -l'
 alias nfc-test='python3 ~/nfc-player/tools/nfc_test.py'
