@@ -1,16 +1,16 @@
-"""Centralized structured logging with colored console and rotating file.
+"""Centralized structured logging with colored console and daily-rotating file.
 
 Log format:  TIMESTAMP | LEVEL | FILE | FUNCTION | MESSAGE
 
 Output targets:
   - stdout  -- colored, human-friendly (short timestamp)
-  - ~/nfc-player/logs/nfc_player.log -- plain text, rotated at 5 MB (3 backups)
+  - ~/nfc-player/logs/nfc_player.log -- plain text, rotated daily at midnight (3 days kept)
 """
 
 import logging
 import os
 import pathlib
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 
 # ── Custom TRACE level (below DEBUG) ──────────────────────────────────────
 TRACE = 5
@@ -21,8 +21,7 @@ _SRC_DIR = pathlib.Path(__file__).resolve().parent
 _PROJECT_DIR = _SRC_DIR.parent
 LOG_DIR = str(_PROJECT_DIR / "logs")
 LOG_FILE = str(_PROJECT_DIR / "logs" / "nfc_player.log")
-MAX_LOG_BYTES = 5 * 1024 * 1024   # 5 MB per file
-LOG_BACKUP_COUNT = 3               # keep 3 rotated backups
+LOG_BACKUP_COUNT = 3               # keep 3 daily backups
 
 # ── Structured format: TIMESTAMP | LEVEL | FILE | FUNCTION | MESSAGE ─────
 _FMT_FILE = "%(asctime)s | %(levelname)-7s | %(filename)-18s | %(funcName)-22s | %(message)s"
@@ -87,14 +86,16 @@ class Logger:
         console.setFormatter(_ColorFormatter(_FMT_CONSOLE, datefmt=_DATEFMT_CONSOLE))
         root.addHandler(console)
 
-        # ── File handler (rotating, plain text) ───────────────────────
+        # ── File handler (daily rotation, plain text) ──────────────────
         try:
             os.makedirs(LOG_DIR, exist_ok=True)
-            fh = RotatingFileHandler(
+            fh = TimedRotatingFileHandler(
                 LOG_FILE,
-                maxBytes=MAX_LOG_BYTES,
+                when="midnight",
                 backupCount=LOG_BACKUP_COUNT,
+                encoding="utf-8",
             )
+            fh.suffix = "%Y-%m-%d"    # rotated files: nfc_player.log.2026-04-09
             fh.setLevel(file_level)
             fh.setFormatter(logging.Formatter(_FMT_FILE, datefmt=_DATEFMT_FILE))
             root.addHandler(fh)

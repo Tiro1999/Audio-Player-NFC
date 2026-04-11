@@ -80,7 +80,7 @@ def main():
     if success:
         logger.info("✅  Playback started!")
     else:
-        logger.error("Playback failed – check: tail -f /var/log/nfc_player.log")
+        logger.error("Playback failed – check: tail -f ~/nfc-player/logs/nfc_player.log")
         sys.exit(1)
 
 

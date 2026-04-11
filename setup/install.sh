@@ -65,11 +65,13 @@ echo "Bluetooth unblocked (persisted in /etc/rc.local)"
 # ------------------------------------------------------------------
 
 # ------------------------------------------------------------------
-# 3. Create log directory (inside project, no /var/log permissions needed)
+# 3. Create log directory + clean up stale log from old installs
 # ------------------------------------------------------------------
 echo -e "\n>>> Creating log directory …"
 mkdir -p "$PROJECT_DIR/logs"
-echo "Log directory: $PROJECT_DIR/logs/"
+echo "Log directory: $PROJECT_DIR/logs/ (daily rotation, 3 days kept)"
+# Remove old /var/log location if left over from a previous install
+[ -f /var/log/nfc_player.log ] && sudo rm -f /var/log/nfc_player.log && echo "  Removed stale /var/log/nfc_player.log"
 
 # ------------------------------------------------------------------
 # 4. Python virtual environment
