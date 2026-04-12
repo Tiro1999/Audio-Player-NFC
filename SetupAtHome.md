@@ -172,14 +172,14 @@ nfc-bt scan
 #   Found 2 device(s):
 #     #    MAC Address          Name
 #     ──── ──────────────────── ──────────────────────────────
-#     1    00:42:79:DF:6C:53    JBL Charge 4
+#     1    00:42:43:44:45:46    JBL Charge 4
 #     2    A0:B1:C2:D3:E4:F5    Bose Mini
 
 # 2. Speaker verbinden (MAC-Adresse von oben kopieren)
-nfc-bt connect 00:42:79:DF:6C:53 --priority 10
+nfc-bt connect 00:42:43:44:45:46 --priority 10
 
 # Ausgabe:
-#   🔗  Connecting to JBL Charge 4 (00:42:79:DF:6C:53) …
+#   🔗  Connecting to JBL Charge 4 (00:42:43:44:45:46) …
 #       Scanning for device …
 #       Pairing …
 #       Connecting …
@@ -210,21 +210,21 @@ nfc-bt list
 #
 #     Prio   MAC Address          Name
 #     ────── ──────────────────── ──────────────────────────────
-#     10     00:42:79:DF:6C:53    JBL Charge 4
+#     10     00:42:43:44:45:46    JBL Charge 4
 #     5      A0:B1:C2:D3:E4:F5    Bose Mini
 
 # Aktuellen Bluetooth-Status vom System anzeigen
-bluetoothctl info 00:42:79:DF:6C:53
+bluetoothctl info 00:42:43:44:45:46
 ```
 
 ### 3.3 Speaker entfernen
 
 ```bash
 # Aus config.json entfernen
-nfc-bt remove 00:42:79:DF:6C:53
+nfc-bt remove 00:42:43:44:45:46
 
 # Optional: Auch aus dem Bluetooth-System entfernen (un-pair)
-bluetoothctl remove 00:42:79:DF:6C:53
+bluetoothctl remove 00:42:43:44:45:46
 
 # Services neu starten, damit der nächste Speaker übernimmt
 nfc-restart
@@ -277,7 +277,7 @@ Speaker mit der höchsten Priorität**.
 
 ```bash
 # Speaker mit verschiedenen Prioritäten hinzufügen
-nfc-bt connect 00:42:79:DF:6C:53 --priority 10   # JBL → höchste Prio
+nfc-bt connect 00:42:43:44:45:46 --priority 10   # JBL → höchste Prio
 nfc-bt connect A0:B1:C2:D3:E4:F5 --priority 8     # Bose → mittlere Prio
 nfc-bt connect C1:D2:E3:F4:05:16 --priority 5     # Marshall → niedrigste Prio
 ```
@@ -286,7 +286,7 @@ nfc-bt connect C1:D2:E3:F4:05:16 --priority 5     # Marshall → niedrigste Prio
 
 ```bash
 # Gleichen connect-Befehl mit neuer Priorität ausführen → überschreibt den Eintrag
-nfc-bt connect 00:42:79:DF:6C:53 --priority 7
+nfc-bt connect 00:42:43:44:45:46 --priority 7
 ```
 
 ---
@@ -344,14 +344,14 @@ sudo nmcli dev wifi connect "SSID" password "Passwort"
 bluetoothctl show | grep Powered
 
 # Speaker-Info anzeigen
-bluetoothctl info 00:42:79:DF:6C:53
+bluetoothctl info 00:42:43:44:45:46
 
 # Manuell verbinden
-bluetoothctl connect 00:42:79:DF:6C:53
+bluetoothctl connect 00:42:43:44:45:46
 
 # Komplett neu koppeln (erst entfernen, dann neu verbinden)
-bluetoothctl remove 00:42:79:DF:6C:53
-nfc-bt connect 00:42:79:DF:6C:53 --priority 10
+bluetoothctl remove 00:42:43:44:45:46
+nfc-bt connect 00:42:43:44:45:46 --priority 10
 
 # Service-Log prüfen
 journalctl -u bt-autoconnect --no-pager -n 20
