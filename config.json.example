@@ -16,5 +16,10 @@
   },
   "behavior": {
     "pause_on_remove": false
+  },
+  "update": {
+    "auto_update": true,
+    "github_repo": "https://github.com/Tiro1999/Audio-Player-NFC.git",
+    "token": ""
   }
 }

@@ -5,6 +5,7 @@ Supports WiFi configuration via NFC tags.
 Run with:  python3 -m src.main
 """
 
+import os
 import signal
 import sys
 import time
@@ -68,6 +69,21 @@ def main():
     logger.info("══════════════════════════════════════════")
     logger.info("  NFC Spotify Player – Starting")
     logger.info("══════════════════════════════════════════")
+
+    # --- Auto-update check (runs once at boot) ---
+    if config.auto_update and config.github_repo:
+        try:
+            from .updater import check_and_update
+            updated = check_and_update(config.github_repo, config.update_token)
+            if updated:
+                logger.info("Restarting with updated code …")
+                # Re-exec ourselves so the new code is loaded immediately.
+                # PID stays the same → systemd still tracks the service.
+                os.execv(sys.executable, [sys.executable, "-m", "src.main"])
+        except Exception as exc:
+            logger.warn("Update check failed: %s (continuing with current version)", exc)
+    elif config.auto_update and not config.github_repo:
+        logger.warn("auto_update is enabled but update.github_repo is not set")
 
     # --- Wait for NFC reader hardware ---
     logger.info("Initializing NFC reader …")

@@ -71,10 +71,13 @@ scp $SSH_OPTS src/nfc_reader.py      "$TARGET:$REMOTE_DIR/src/"
 scp $SSH_OPTS src/spotify_player.py  "$TARGET:$REMOTE_DIR/src/"
 scp $SSH_OPTS src/bt_connect.py      "$TARGET:$REMOTE_DIR/src/"
 scp $SSH_OPTS src/logger.py          "$TARGET:$REMOTE_DIR/src/"
+scp $SSH_OPTS src/wifi_manager.py    "$TARGET:$REMOTE_DIR/src/"
+scp $SSH_OPTS src/updater.py         "$TARGET:$REMOTE_DIR/src/"
 
 # ── Copy setup files ──────────────────────────────────────────────────────
 echo "⚙️   Copying setup & tools …"
 scp $SSH_OPTS requirements.txt               "$TARGET:$REMOTE_DIR/"
+scp $SSH_OPTS version.txt                    "$TARGET:$REMOTE_DIR/"
 scp $SSH_OPTS setup/install.sh               "$TARGET:$REMOTE_DIR/setup/"
 scp $SSH_OPTS setup/nfc-player.service       "$TARGET:$REMOTE_DIR/setup/"
 scp $SSH_OPTS setup/bt-autoconnect.service   "$TARGET:$REMOTE_DIR/setup/"

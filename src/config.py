@@ -110,6 +110,20 @@ class Config:
     def pause_on_remove(self):
         return self._data.get("behavior", {}).get("pause_on_remove", False)
 
+    # --- Update ---
+    @property
+    def auto_update(self):
+        return self._data.get("update", {}).get("auto_update", False)
+
+    @property
+    def github_repo(self):
+        return self._data.get("update", {}).get("github_repo", "")
+
+    @property
+    def update_token(self):
+        """Optional GitHub PAT for private repos (leave empty for public)."""
+        return self._data.get("update", {}).get("token", "")
+
     # --- Spotify token cache ---
     @property
     def spotify_cache_path(self):
