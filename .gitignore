@@ -7,4 +7,5 @@ spotify_cache
 .env
 config.json
 logs/
+.needs_install
 /hardware-docs/private-res/

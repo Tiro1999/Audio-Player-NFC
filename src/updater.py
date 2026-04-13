@@ -34,6 +34,7 @@ logger = Logger(__name__)
 
 _PROJECT_DIR = pathlib.Path(__file__).resolve().parent.parent
 _VERSION_FILE = _PROJECT_DIR / "version.txt"
+_NEEDS_INSTALL_FLAG = _PROJECT_DIR / ".needs_install"
 
 # Files/directories that get replaced during an update
 _UPDATE_TARGETS = ["src", "tools", "setup", "requirements.txt", "version.txt"]
@@ -154,6 +155,8 @@ def _apply_tarball(tarball_path):
 
     Returns True on success, False on failure.
     """
+    setup_updated = False
+
     with tempfile.TemporaryDirectory() as tmpdir:
         # Extract
         try:
@@ -186,9 +189,15 @@ def _apply_tarball(tarball_path):
                 else:
                     shutil.copy2(src, dst)
                 logger.debug("Updated: %s", target)
+                if target == "setup":
+                    setup_updated = True
             except Exception as exc:
                 logger.error("Failed to update %s: %s", target, exc)
                 return False
+
+    if setup_updated:
+        _NEEDS_INSTALL_FLAG.write_text("pending")
+        logger.debug("Flagged for post-install (setup/ changed)")
 
     return True
 
@@ -215,6 +224,37 @@ def _pip_install_if_needed(old_reqs_hash):
         logger.info("Dependencies updated successfully")
     else:
         logger.error("pip install failed: %s", result.stderr.strip())
+
+
+def _run_post_install():
+    """Run setup/install.sh if the update shipped changes to setup/.
+
+    The install script re-deploys systemd services, shell aliases,
+    PulseAudio config, etc. — things that os.execv alone cannot refresh.
+    Only runs when _NEEDS_INSTALL_FLAG exists (set during _apply_tarball
+    when setup/ was updated).
+    """
+    install_sh = _PROJECT_DIR / "setup" / "install.sh"
+    if not install_sh.exists():
+        logger.debug("setup/install.sh not found — skipping post-install")
+        return
+
+    logger.info("Running post-update install (setup/install.sh) …")
+    try:
+        result = subprocess.run(
+            ["bash", str(install_sh)],
+            capture_output=True, text=True, timeout=300,
+            cwd=str(_PROJECT_DIR),
+        )
+        if result.returncode == 0:
+            logger.info("Post-update install completed successfully")
+        else:
+            logger.error("Post-update install failed (exit %d): %s",
+                         result.returncode, result.stderr.strip()[-500:])
+    except subprocess.TimeoutExpired:
+        logger.error("Post-update install timed out (300s)")
+    except Exception as exc:
+        logger.error("Post-update install error: %s", exc)
 
 
 # ── Public API ────────────────────────────────────────────────────────────
@@ -299,6 +339,14 @@ def check_and_update(github_repo, token=""):
 
         # 7. Install new dependencies if needed
         _pip_install_if_needed(old_reqs_hash)
+
+        # 8. Run setup/install.sh if setup/ was updated
+        if _NEEDS_INSTALL_FLAG.exists():
+            _run_post_install()
+            try:
+                _NEEDS_INSTALL_FLAG.unlink()
+            except OSError:
+                pass
 
         logger.info("══════════════════════════════════════════")
         logger.info("  ✅ Updated to %s", latest_tag)

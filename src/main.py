@@ -73,7 +73,16 @@ def main():
     # --- Auto-update check (runs once at boot) ---
     if config.auto_update and config.github_repo:
         try:
-            from .updater import check_and_update
+            from .updater import check_and_update, _NEEDS_INSTALL_FLAG, _run_post_install
+            # Recover from interrupted update: if flag exists, install.sh didn't run yet
+            if _NEEDS_INSTALL_FLAG.exists():
+                logger.info("Pending post-install from previous update — running now …")
+                _run_post_install()
+                try:
+                    _NEEDS_INSTALL_FLAG.unlink()
+                except OSError:
+                    pass
+
             updated = check_and_update(config.github_repo, config.update_token)
             if updated:
                 logger.info("Restarting with updated code …")
