@@ -1,2 +1,21 @@
-# Force LF line endings for shell scripts (even on Windows)
-*.sh text eol=lf
+# Normalize every text file to LF in the repository and in working trees.
+# The Pi runs Linux: CRLF breaks shell scripts, shebangs and systemd units.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Diagrams are SVG text with an embedded draw.io model.
+*.drawio.svg text eol=lf
+
+# Binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.stl binary
+*.pdf binary
+*.tgz binary
+*.gz binary

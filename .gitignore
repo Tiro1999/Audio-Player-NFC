@@ -1,12 +1,40 @@
+# --- Python ---
 __pycache__/
 *.pyc
 *.pyo
 venv/
+.venv/
 .pytest_cache/
-spotify_cache
+.ruff_cache/
+.cache/
+
+# --- Build output ---
+dist/
+build/
+
+# --- Secrets & device data (never commit) ---
 .env
+.env.*
+!.env.example
 config.json
+config*.json
+!config.json.example
+spotify_cache
+spotify_cache*
+*token*.json
+*.bak
+
+# --- Logs ---
 logs/
+*.log
+
+# --- Legacy runtime flags ---
 .needs_install
+
+# --- Private hardware material ---
 /hardware-docs/private-res/
+/documentation/hardware/private-res/
+
+# --- Claude Code: local settings and own notes ---
 .claude/*.local.*
+.claude-local/
