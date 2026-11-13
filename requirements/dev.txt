@@ -1,0 +1,9 @@
+# Development tools (PC / CI). Device runtime deps: device.in / device.lock.
+pytest==9.2.0
+ruff==0.17.5
+shellcheck-py==0.11.0.1
+uv==0.13.8
+pip-audit==2.10.1
+pyyaml==6.0.3
+# needed by the NFC parsing tests
+ndeflib==0.3.3

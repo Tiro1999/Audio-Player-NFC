@@ -1,0 +1,5 @@
+# Runtime dependencies on the Pi (Python 3.13, aarch64).
+# Regenerate the lock with the VS Code task "Deps: Lock".
+adafruit-circuitpython-pn532==2.4.9
+adafruit-blinka==10.2.0
+ndeflib==0.3.3
