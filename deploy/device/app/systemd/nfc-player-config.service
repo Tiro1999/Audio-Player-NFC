@@ -1,0 +1,17 @@
+# Config import (root): validates the boot config, imports secrets and WiFi
+# seeds, writes the device copy. Runs before the other nfc-player units.
+[Unit]
+Description=NFC player config import
+After=NetworkManager.service
+Before=nfc-player.service nfc-player-receiver.service nfc-player-bluetooth.service nfc-player-update.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=no
+Environment=PYTHONPATH=/opt/nfc-player/current/src PYTHONUNBUFFERED=1
+ExecStart=/opt/nfc-player/current/venv/bin/python -m nfc_player.app.config_import
+# A hanging import must not hold back the player at boot.
+TimeoutStartSec=5min
+
+[Install]
+WantedBy=multi-user.target

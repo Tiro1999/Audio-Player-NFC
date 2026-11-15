@@ -1,0 +1,10 @@
+# Looks for a new release 3 minutes after boot.
+[Unit]
+Description=NFC player auto-update after boot
+
+[Timer]
+OnBootSec=3min
+Unit=nfc-player-update.service
+
+[Install]
+WantedBy=timers.target

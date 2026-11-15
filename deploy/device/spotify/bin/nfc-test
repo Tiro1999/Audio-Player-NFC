@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# nfc-test <spotify URI or link>: plays it on the receiver, no tag needed.
+# -P: never import from the caller's working directory.
+exec sudo -u nfc-player env PYTHONPATH=/opt/nfc-player/current/src \
+    /opt/nfc-player/current/venv/bin/python -P -m nfc_player.spotify.cli "$@"

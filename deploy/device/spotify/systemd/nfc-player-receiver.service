@@ -1,0 +1,24 @@
+# Spotify Connect receiver (go-librespot) in the PipeWire session of nfc-player.
+[Unit]
+Description=NFC player Spotify receiver
+Wants=user@@NFC_UID@.service
+After=user@@NFC_UID@.service network-online.target
+
+[Service]
+User=nfc-player
+Environment=XDG_RUNTIME_DIR=/run/user/@NFC_UID@ PULSE_SERVER=unix:/run/user/@NFC_UID@/pulse/native
+Environment=PYTHONPATH=/opt/nfc-player/current/src PYTHONUNBUFFERED=1
+ExecStartPre=/opt/nfc-player/current/venv/bin/python -m nfc_player.spotify.receiver_config
+ExecStart=/opt/nfc-player/receiver/go-librespot --config_dir /var/lib/nfc-player/receiver
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=yes
+ProtectSystem=strict
+# read-only, not hidden: the PipeWire socket lives under /run/user.
+ProtectHome=read-only
+PrivateTmp=yes
+ReadWritePaths=/var/lib/nfc-player
+
+[Install]
+WantedBy=multi-user.target

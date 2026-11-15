@@ -1,0 +1,12 @@
+# Auto-update (root): fetches the latest GitHub release and installs it with
+# install-release.sh. Started by nfc-player-update.timer.
+[Unit]
+Description=NFC player auto-update
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=PYTHONPATH=/opt/nfc-player/current/src PYTHONUNBUFFERED=1
+ExecStart=/opt/nfc-player/current/venv/bin/python -m nfc_player.update.github
+TimeoutStartSec=45min

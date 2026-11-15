@@ -1,0 +1,22 @@
+# NFC player main service: reads tags and plays or switches WiFi.
+[Unit]
+Description=NFC player
+After=nfc-player-config.service nfc-player-receiver.service network-online.target
+Wants=nfc-player-config.service nfc-player-receiver.service network-online.target
+
+[Service]
+User=nfc-player
+SupplementaryGroups=i2c
+Environment=PYTHONPATH=/opt/nfc-player/current/src PYTHONUNBUFFERED=1
+ExecStart=/opt/nfc-player/current/venv/bin/python -m nfc_player
+Restart=always
+RestartSec=5
+TimeoutStopSec=15
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/nfc-player
+
+[Install]
+WantedBy=multi-user.target

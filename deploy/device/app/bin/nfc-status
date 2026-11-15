@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# nfc-status: state of every nfc-player unit.
+exec systemctl status 'nfc-player*' --no-pager -l "$@"

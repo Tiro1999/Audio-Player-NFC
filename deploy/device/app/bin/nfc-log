@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# nfc-log: follows the log of every nfc-player unit (Ctrl-C ends it).
+exec journalctl -f -u 'nfc-player*' "$@"

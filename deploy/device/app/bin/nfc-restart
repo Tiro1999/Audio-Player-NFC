@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# nfc-restart: restarts the installed nfc-player services.
+set -euo pipefail
+
+units=()
+for unit in nfc-player-receiver.service nfc-player-bluetooth.service nfc-player.service; do
+    if [[ -f "/etc/systemd/system/$unit" ]]; then
+        units+=("$unit")
+    fi
+done
+exec sudo systemctl restart "${units[@]}"

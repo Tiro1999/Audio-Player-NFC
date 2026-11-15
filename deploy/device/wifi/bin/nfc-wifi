@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# nfc-wifi: manage WiFi profiles (see nfc-wifi --help). Root, because it
+# edits the boot config.
+# -P: never import from the caller's working directory.
+exec sudo env PYTHONPATH=/opt/nfc-player/current/src \
+    /opt/nfc-player/current/venv/bin/python -P -m nfc_player.wifi.cli "$@"
